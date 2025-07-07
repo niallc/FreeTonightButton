@@ -39,11 +39,49 @@ try {
     exit;
 }
 
-// Route based on HTTP method
+// Route based on HTTP method and query parameters
 error_log("Processing " . $_SERVER['REQUEST_METHOD'] . " request");
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Handle setting status
+// Check if this is a set action via GET
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['action'] === 'set') {
+    // Handle setting status via GET
+    error_log("Processing SET action via GET");
+    
+    if (!isset($_GET['name']) || empty(trim($_GET['name']))) {
+        error_log("Validation failed: name is missing or empty in GET parameters");
+        http_response_code(400);
+        echo json_encode(['error' => 'Name is required']);
+        exit;
+    }
+    
+    $name = trim(strip_tags($_GET['name']));
+    $name = substr($name, 0, 50); // Limit length to 50 characters
+    
+    if (empty($name)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Name cannot be empty']);
+        exit;
+    }
+    
+    $timestamp = time();
+    
+    try {
+        error_log("Preparing to insert/update name: " . $name . " with timestamp: " . $timestamp);
+        $stmt = $pdo->prepare('REPLACE INTO status (name, timestamp) VALUES (:name, :timestamp)');
+        $result = $stmt->execute(['name' => $name, 'timestamp' => $timestamp]);
+        error_log("Database operation result: " . ($result ? 'success' : 'failed'));
+        
+        echo json_encode(['success' => true, 'name' => $name]);
+        
+    } catch (PDOException $e) {
+        error_log("Failed to update status: " . $e->getMessage());
+        error_log("SQL State: " . $e->getCode());
+        http_response_code(500);
+        echo json_encode(['error' => 'Failed to update status: ' . $e->getMessage()]);
+    }
+    
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Handle setting status via POST (fallback)
     $input = file_get_contents('php://input');
     error_log("Raw input received: " . $input);
     

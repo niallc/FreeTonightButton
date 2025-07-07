@@ -1,5 +1,5 @@
 // Version tracking
-const APP_VERSION = '1.0.2';
+const APP_VERSION = '1.0.3';
 console.log('FreeTonight App v' + APP_VERSION + ' loaded');
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -37,13 +37,10 @@ document.addEventListener('DOMContentLoaded', function() {
             freeButton.disabled = true;
             freeButton.textContent = 'Updating...';
             
-            const response = await fetch('./api.php?t=' + Date.now(), {
-                method: 'POST',
+            const response = await fetch('./api.php?action=set&name=' + encodeURIComponent(userName) + '&t=' + Date.now(), {
                 headers: {
-                    'Content-Type': 'application/json',
                     'Cache-Control': 'no-cache'
-                },
-                body: JSON.stringify({ name: userName })
+                }
             });
             
             const result = await response.json();
