@@ -4,13 +4,13 @@ header('Content-Type: application/json');
 // Enable error logging
 error_reporting(E_ALL);
 ini_set('log_errors', 1);
-ini_set('error_log', 'php_errors.log');
+ini_set('error_log', '/home/private/freetonight/php_errors.log');
 
 // Log all API calls with more detail
 error_log("API call: " . $_SERVER['REQUEST_METHOD'] . " from " . $_SERVER['REMOTE_ADDR'] . " at " . date('Y-m-d H:i:s') . " - User Agent: " . $_SERVER['HTTP_USER_AGENT']);
 
-// Database setup
-$db_file = 'friends.db';
+// Database setup - Use private directory for writable access
+$db_file = '/home/private/freetonight/friends.db';
 
 try {
     error_log("Attempting to connect to database: " . $db_file);
