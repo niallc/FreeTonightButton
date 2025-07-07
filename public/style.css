@@ -1,0 +1,165 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+#app-container {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    padding: 40px;
+    max-width: 500px;
+    width: 100%;
+    text-align: center;
+}
+
+h1 {
+    color: #333;
+    margin-bottom: 30px;
+    font-size: 2.5rem;
+    font-weight: 700;
+}
+
+.input-section {
+    margin-bottom: 30px;
+}
+
+#name-input {
+    width: 100%;
+    padding: 15px 20px;
+    border: 2px solid #e1e5e9;
+    border-radius: 10px;
+    font-size: 16px;
+    margin-bottom: 15px;
+    transition: border-color 0.3s ease;
+}
+
+#name-input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+#free-button {
+    width: 100%;
+    padding: 15px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+#free-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+}
+
+#free-button:active {
+    transform: translateY(0);
+}
+
+#status-bar {
+    margin: 20px 0;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #666;
+    min-height: 20px;
+}
+
+.list-section h2 {
+    color: #333;
+    margin-bottom: 20px;
+    font-size: 1.5rem;
+}
+
+#free-list {
+    list-style: none;
+    text-align: left;
+}
+
+#free-list li {
+    padding: 15px 20px;
+    margin-bottom: 10px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border-left: 4px solid #667eea;
+    font-size: 16px;
+    color: #333;
+    transition: transform 0.2s ease;
+}
+
+#free-list li:hover {
+    transform: translateX(5px);
+}
+
+#free-list:empty::after {
+    content: "No one has marked themselves as free yet.";
+    display: block;
+    text-align: center;
+    color: #999;
+    font-style: italic;
+    padding: 20px;
+}
+
+.refresh-btn {
+    background: #f8f9fa;
+    border: 2px solid #e1e5e9;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    margin-bottom: 15px;
+    transition: all 0.2s ease;
+}
+
+.refresh-btn:hover {
+    background: #e9ecef;
+    border-color: #667eea;
+}
+
+.refresh-btn:active {
+    transform: scale(0.95);
+}
+
+@media (max-width: 600px) {
+    #app-container {
+        padding: 20px;
+        margin: 10px;
+    }
+    
+    h1 {
+        font-size: 2rem;
+    }
+    
+    #name-input, #free-button {
+        padding: 12px 16px;
+        font-size: 16px;
+    }
+}
+
+.version-info {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    font-size: 10px;
+    color: rgba(102, 126, 234, 0.5);
+    font-family: monospace;
+    pointer-events: none;
+    z-index: 1000;
+} 

@@ -2,10 +2,24 @@
 
 A simple web application for a trusted group to indicate availability.
 
-## 🏗️ **New Directory Structure**
+## 🏗️ **Directory Structure**
 
 The app has been refactored to solve SQLite write permission issues on shared hosting:
 
+**Local Development:**
+```
+FreeTonightButton/
+├── public/           # Web-accessible files
+│   ├── index.html
+│   ├── style.css
+│   ├── app.js
+│   ├── api.php
+│   └── test_api.html
+└── private/freetonight/  # Private, writable files
+    └── friends.db
+```
+
+**Server Deployment:**
 ```
 /home/public/freetonight/     # Web-accessible files
 ├── index.html
