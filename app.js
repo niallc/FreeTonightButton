@@ -1,9 +1,14 @@
+// Version tracking
+const APP_VERSION = '1.0.1';
+console.log('FreeTonight App v' + APP_VERSION + ' loaded');
+
 document.addEventListener('DOMContentLoaded', function() {
     // DOM references
     const nameInput = document.getElementById('name-input');
     const freeButton = document.getElementById('free-button');
     const statusBar = document.getElementById('status-bar');
     const freeList = document.getElementById('free-list');
+    const refreshButton = document.getElementById('refresh-button');
     
     // Global variables
     let lastRefreshTime = new Date();
@@ -32,10 +37,11 @@ document.addEventListener('DOMContentLoaded', function() {
             freeButton.disabled = true;
             freeButton.textContent = 'Updating...';
             
-            const response = await fetch('./api.php', {
+            const response = await fetch('./api.php?t=' + Date.now(), {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache'
                 },
                 body: JSON.stringify({ name: userName })
             });
@@ -51,7 +57,12 @@ document.addEventListener('DOMContentLoaded', function() {
             
         } catch (error) {
             statusBar.textContent = 'Network error. Please try again.';
-            console.error('Error:', error);
+            console.error('Error details:', error);
+            console.error('Error message:', error.message);
+            if (error.response) {
+                console.error('Response status:', error.response.status);
+                console.error('Response text:', await error.response.text());
+            }
         } finally {
             freeButton.disabled = false;
             freeButton.textContent = "I'm Free Tonight!";
@@ -61,7 +72,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Get free list function
     async function getFreeList() {
         try {
-            const response = await fetch('./api.php');
+            const response = await fetch('./api.php?t=' + Date.now(), {
+                headers: {
+                    'Cache-Control': 'no-cache'
+                }
+            });
             const users = await response.json();
             
             // Clear current list
@@ -82,6 +97,11 @@ document.addEventListener('DOMContentLoaded', function() {
             
         } catch (error) {
             console.error('Error fetching free list:', error);
+            console.error('Error message:', error.message);
+            if (error.response) {
+                console.error('Response status:', error.response.status);
+                console.error('Response text:', await error.response.text());
+            }
             statusBar.textContent = 'Failed to load the list. Please refresh the page.';
         }
     }
@@ -105,6 +125,27 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // Health check function
+    async function checkHealth() {
+        try {
+            const response = await fetch('./api.php?t=' + Date.now(), { 
+                method: 'HEAD',
+                headers: {
+                    'Cache-Control': 'no-cache'
+                }
+            });
+            if (response.ok) {
+                console.log('Server health check: OK');
+            } else {
+                console.warn('Server health check: Failed');
+                statusBar.textContent = 'Warning: Server health check failed';
+            }
+        } catch (error) {
+            console.error('Health check error:', error);
+            statusBar.textContent = 'Warning: Cannot connect to server';
+        }
+    }
+    
     // Update timer function
     function updateTimer() {
         const now = new Date();
@@ -114,6 +155,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Event listeners
     freeButton.addEventListener('click', setFreeStatus);
+    refreshButton.addEventListener('click', async function() {
+        refreshButton.textContent = '🔄 Refreshing...';
+        refreshButton.disabled = true;
+        await getFreeList();
+        refreshButton.textContent = '🔄 Refresh';
+        refreshButton.disabled = false;
+    });
     
     // Allow Enter key to submit
     nameInput.addEventListener('keypress', function(event) {
@@ -128,6 +176,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Update timer every second
     setInterval(updateTimer, 1000);
     
+    // Health check on startup
+    checkHealth();
+    
     // Initial load
     getFreeList();
+    
+    // Log version for debugging
+    console.log('App initialized with version:', APP_VERSION);
 }); 
