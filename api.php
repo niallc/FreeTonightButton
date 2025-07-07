@@ -33,7 +33,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
     
-    $name = trim($data['name']);
+    $name = trim(strip_tags($data['name']));
+    $name = substr($name, 0, 50); // Limit length to 50 characters
+    
+    if (empty($name)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Name cannot be empty']);
+        exit;
+    }
+    
     $timestamp = time();
     
     try {
@@ -56,6 +64,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute(['start_of_day' => $start_of_day]);
         
         $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Sanitize names before sending to client
+        foreach ($users as &$user) {
+            $user['name'] = htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8');
+        }
+        
         echo json_encode($users);
         
     } catch (PDOException $e) {

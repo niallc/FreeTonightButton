@@ -37,6 +37,7 @@ Create the following files in the root directory:
 **Step 1.3: Implement POST Request Logic (Setting Status)**
 -   This block handles a user declaring they are free.
 -   Retrieve the incoming JSON payload using `file_get_contents('php://input')` and decode it with `json_decode()`. The payload will be `{"name": "username"}`.
+-   **Input Sanitization:** Sanitize the name using `strip_tags()` and limit length to 50 characters. Validate that the name is not empty after sanitization.
 -   **Core Logic:** Use SQLite's `REPLACE INTO` statement. This is the simplest way to handle both new and existing users. `REPLACE INTO status (name, timestamp) VALUES (:name, :timestamp);`.
     -   This command will insert a new row if the `name` doesn't exist, or it will delete the old row and insert a new one if the `name` already exists, effectively updating the timestamp.
 -   Bind the user's name and the current UNIX timestamp (`time()`) to the query.
@@ -49,6 +50,7 @@ Create the following files in the root directory:
 -   Prepare and execute a SQL query: `SELECT name, timestamp FROM status WHERE timestamp >= :start_of_day`.
 -   Bind the `$start_of_day` value.
 -   Fetch all results into an associative array.
+-   **Output Sanitization:** Sanitize all names using `htmlspecialchars()` before sending to client to prevent XSS attacks.
 -   Encode the resulting array into JSON and `echo` it as the response.
 
 ## 4. Phase 2: Frontend Static Files (`index.html`, `style.css`)
