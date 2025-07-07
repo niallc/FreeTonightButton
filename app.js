@@ -1,5 +1,5 @@
 // Version tracking
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.2';
 console.log('FreeTonight App v' + APP_VERSION + ' loaded');
 
 document.addEventListener('DOMContentLoaded', function() {
