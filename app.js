@@ -1,5 +1,5 @@
 // Version tracking
-const APP_VERSION = '1.0.3';
+const APP_VERSION = '1.0.4';
 console.log('FreeTonight App v' + APP_VERSION + ' loaded');
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -37,13 +37,20 @@ document.addEventListener('DOMContentLoaded', function() {
             freeButton.disabled = true;
             freeButton.textContent = 'Updating...';
             
-            const response = await fetch('./api.php?action=set&name=' + encodeURIComponent(userName) + '&t=' + Date.now(), {
+            const url = './api.php?action=set&name=' + encodeURIComponent(userName) + '&t=' + Date.now();
+            console.log('Making GET request to:', url);
+            
+            const response = await fetch(url, {
                 headers: {
                     'Cache-Control': 'no-cache'
                 }
             });
             
+            console.log('Response status:', response.status);
+            console.log('Response ok:', response.ok);
+            
             const result = await response.json();
+            console.log('Response data:', result);
             
             if (result.success) {
                 statusBar.textContent = `Successfully marked ${userName} as free tonight!`;
