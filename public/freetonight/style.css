@@ -229,10 +229,6 @@ button {
     font-size: 0.95em;
     margin-left: 10px;
     margin-right: 10px;
-    max-width: 200px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 #free-list span.activity {
