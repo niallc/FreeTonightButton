@@ -2,7 +2,9 @@
 const APP_VERSION = '1.0.0';
 
 // DOM elements
-let nameInput, freeButton, removeButton, refreshButton, actionFeedback, statusBar, freeList;
+let nameInput, activityInput, freeInHoursInput, freeInMinutesInput, availableForHoursInput, availableForMinutesInput;
+let freeButton, removeButton, refreshButton, actionFeedback, statusBar, freeList;
+let toggleOptionsButton, moreOptionsDiv;
 
 // Timers
 let refreshTimer, updateTimer;
@@ -19,6 +21,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function initializeElements() {
     nameInput = document.getElementById('name-input');
+    toggleOptionsButton = document.getElementById('toggle-options');
+    moreOptionsDiv = document.getElementById('more-options');
+    activityInput = document.getElementById('activity-input');
+    freeInHoursInput = document.getElementById('free-in-hours');
+    freeInMinutesInput = document.getElementById('free-in-minutes');
+    availableForHoursInput = document.getElementById('available-for-hours');
+    availableForMinutesInput = document.getElementById('available-for-minutes');
     freeButton = document.getElementById('free-button');
     removeButton = document.getElementById('remove-button');
     refreshButton = document.getElementById('refresh-button');
@@ -32,7 +41,22 @@ function setupEventListeners() {
     nameInput.addEventListener('input', function() {
         localStorage.setItem('freetonight_name', this.value);
     });
-    
+    // Allow pressing Enter in the name field to submit
+    nameInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            setFreeStatus();
+        }
+    });
+    // Toggle more options
+    toggleOptionsButton.addEventListener('click', function() {
+        if (moreOptionsDiv.style.display === 'none') {
+            moreOptionsDiv.style.display = 'block';
+            toggleOptionsButton.textContent = 'Hide options';
+        } else {
+            moreOptionsDiv.style.display = 'none';
+            toggleOptionsButton.textContent = 'Show more options';
+        }
+    });
     // Button click handlers
     freeButton.addEventListener('click', setFreeStatus);
     removeButton.addEventListener('click', removeStatus);
@@ -60,18 +84,30 @@ async function setFreeStatus() {
         showActionFeedback('Please enter your name first', 'error');
         return;
     }
-    
+    let activity = activityInput.value.trim();
+    if (!activity) {
+        activity = 'up for anything';
+    }
+    const freeInMinutes = (parseInt(freeInHoursInput.value, 10) || 0) * 60 + (parseInt(freeInMinutesInput.value, 10) || 0);
+    const availableForMinutes = (parseInt(availableForHoursInput.value, 10) || 0) * 60 + (parseInt(availableForMinutesInput.value, 10) || 0);
+    if (availableForMinutes <= 0) {
+        showActionFeedback('Available for must be greater than 0 minutes', 'error');
+        return;
+    }
     try {
-        const response = await fetch('api.php', {
+        const response = await fetch('/freetonight/api.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ name: name })
+            body: JSON.stringify({
+                name: name,
+                activity: activity,
+                free_in_minutes: freeInMinutes,
+                available_for_minutes: availableForMinutes
+            })
         });
-        
         const data = await response.json();
-        
         if (response.ok) {
             showActionFeedback(data.message || 'Status updated!', 'success');
             getFreeList(); // Refresh the list
@@ -92,7 +128,7 @@ async function removeStatus() {
     }
     
     try {
-        const response = await fetch('api.php', {
+        const response = await fetch('/freetonight/api.php', {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json'
@@ -116,7 +152,7 @@ async function removeStatus() {
 
 async function getFreeList() {
     try {
-        const response = await fetch('api.php');
+        const response = await fetch('/freetonight/api.php');
         const data = await response.json();
         
         if (response.ok) {
@@ -147,33 +183,38 @@ function displayFreeList(users) {
     users.forEach(user => {
         const listItem = document.createElement('li');
         const nameSpan = document.createElement('span');
+        const activitySpan = document.createElement('span');
         const timeSpan = document.createElement('span');
         
         nameSpan.textContent = user.name;
-        timeSpan.textContent = formatTimestamp(user.timestamp);
+        activitySpan.textContent = user.activity ? ` (${user.activity})` : '';
+        timeSpan.textContent = formatRelativeTime(user.free_in_minutes, user.available_for_minutes);
         timeSpan.className = 'timestamp';
         
         listItem.appendChild(nameSpan);
+        listItem.appendChild(activitySpan);
         listItem.appendChild(timeSpan);
         freeList.appendChild(listItem);
     });
 }
 
-function formatTimestamp(timestamp) {
-    const now = Math.floor(Date.now() / 1000);
-    const diff = now - timestamp;
-    
-    if (diff < 60) {
-        return 'Just now';
-    } else if (diff < 3600) {
-        const minutes = Math.floor(diff / 60);
-        return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
-    } else if (diff < 86400) {
-        const hours = Math.floor(diff / 3600);
-        return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+function formatRelativeTime(freeIn, availableFor) {
+    if (freeIn > 0) {
+        return `Free in ${formatMinutes(freeIn)} (for ${formatMinutes(availableFor)})`;
     } else {
-        return 'More than a day ago';
+        return `Free now (for ${formatMinutes(availableFor)})`;
     }
+}
+
+function formatMinutes(mins) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    let out = '';
+    if (h > 0) out += `${h}h`;
+    if (h > 0 && m > 0) out += ' ';
+    if (m > 0) out += `${m}m`;
+    if (out === '') out = '0m';
+    return out;
 }
 
 function showActionFeedback(message, type) {

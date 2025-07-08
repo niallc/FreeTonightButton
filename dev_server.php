@@ -12,6 +12,6 @@ echo "Press Ctrl+C to stop the server\n\n";
 chdir(__DIR__ . '/public');
 
 // Start the PHP development server
-$command = 'php -S localhost:8000';
+$command = 'php -S localhost:8002';
 echo "Running: $command\n";
 system($command); 

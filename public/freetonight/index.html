@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>I'm Free Tonight</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/freetonight/style.css">
 </head>
 <body>
     <div id="app-container">
@@ -12,6 +12,21 @@
         
         <div class="input-section">
             <input type="text" id="name-input" placeholder="Enter your name" maxlength="50">
+            <button id="toggle-options" type="button">Show more options</button>
+            <div id="more-options" style="display:none;">
+                <label for="activity-input">Activity (optional):</label>
+                <input type="text" id="activity-input" placeholder="What are you up for? (e.g. Dinner, Movie)" maxlength="40">
+                <div class="when-fields">
+                    <label>Free in:
+                        <input type="number" id="free-in-hours" min="0" max="23" value="0" style="width:3em;"> h
+                        <input type="number" id="free-in-minutes" min="0" max="59" value="0" style="width:3em;"> m
+                    </label>
+                    <label>Available for:
+                        <input type="number" id="available-for-hours" min="0" max="23" value="2" style="width:3em;"> h
+                        <input type="number" id="available-for-minutes" min="0" max="59" value="0" style="width:3em;"> m
+                    </label>
+                </div>
+            </div>
             <div class="button-group">
                 <button id="free-button">I'm Free Tonight!</button>
                 <button id="remove-button">Remove Me</button>
@@ -37,6 +52,6 @@
     
     <div id="version-info">v1.0.0</div>
     
-    <script src="app.js"></script>
+    <script src="/freetonight/app.js"></script>
 </body>
 </html> 

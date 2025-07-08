@@ -21,6 +21,9 @@ try {
     $pdo->exec('CREATE TABLE IF NOT EXISTS status (
         id INTEGER PRIMARY KEY,
         name TEXT NOT NULL UNIQUE,
+        activity TEXT DEFAULT "Anything",
+        free_in_minutes INTEGER DEFAULT 0,
+        available_for_minutes INTEGER DEFAULT 240,
         timestamp INTEGER NOT NULL
     )');
     error_log("Debug: Table creation/check completed");
@@ -59,9 +62,25 @@ switch ($_SERVER['REQUEST_METHOD']) {
             exit;
         }
         
+        // New fields with defaults
+        $activity = isset($input['activity']) ? trim($input['activity']) : 'Anything';
+        if (strlen($activity) > 100) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Activity too long (max 100 characters)']);
+            exit;
+        }
+        $free_in_minutes = isset($input['free_in_minutes']) && is_numeric($input['free_in_minutes']) ? (int)$input['free_in_minutes'] : 0;
+        $available_for_minutes = isset($input['available_for_minutes']) && is_numeric($input['available_for_minutes']) ? (int)$input['available_for_minutes'] : 240;
+        
         try {
-            $stmt = $pdo->prepare('REPLACE INTO status (name, timestamp) VALUES (:name, :timestamp)');
-            $stmt->execute(['name' => $name, 'timestamp' => time()]);
+            $stmt = $pdo->prepare('REPLACE INTO status (name, activity, free_in_minutes, available_for_minutes, timestamp) VALUES (:name, :activity, :free_in_minutes, :available_for_minutes, :timestamp)');
+            $stmt->execute([
+                'name' => $name,
+                'activity' => $activity,
+                'free_in_minutes' => $free_in_minutes,
+                'available_for_minutes' => $available_for_minutes,
+                'timestamp' => time()
+            ]);
             
             echo json_encode([
                 'success' => true,
@@ -115,13 +134,16 @@ switch ($_SERVER['REQUEST_METHOD']) {
         $start_of_day = strtotime('today', time());
         
         try {
-            $stmt = $pdo->prepare('SELECT name, timestamp FROM status WHERE timestamp >= :start_of_day ORDER BY timestamp DESC');
+            $stmt = $pdo->prepare('SELECT name, activity, free_in_minutes, available_for_minutes, timestamp FROM status WHERE timestamp >= :start_of_day ORDER BY timestamp DESC');
             $stmt->execute(['start_of_day' => $start_of_day]);
             
             $users = [];
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                 $users[] = [
                     'name' => htmlspecialchars($row['name']),
+                    'activity' => htmlspecialchars($row['activity']),
+                    'free_in_minutes' => (int)$row['free_in_minutes'],
+                    'available_for_minutes' => (int)$row['available_for_minutes'],
                     'timestamp' => $row['timestamp']
                 ];
             }
