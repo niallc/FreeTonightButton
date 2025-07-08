@@ -235,6 +235,21 @@ button {
     text-overflow: ellipsis;
 }
 
+#free-list span.activity {
+    max-width: 180px;
+    overflow-x: auto;
+    white-space: nowrap;
+    display: inline-block;
+    vertical-align: middle;
+    cursor: pointer;
+    transition: none;
+    background: none;
+    scrollbar-width: thin;
+}
+#free-list span.activity:hover {
+    background: none;
+}
+
 .timestamp {
     font-size: 0.95em;
     color: #666;

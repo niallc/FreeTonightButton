@@ -140,8 +140,8 @@ switch ($_SERVER['REQUEST_METHOD']) {
             $users = [];
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                 $users[] = [
-                    'name' => htmlspecialchars($row['name']),
-                    'activity' => htmlspecialchars($row['activity']),
+                    'name' => $row['name'],
+                    'activity' => $row['activity'],
                     'free_in_minutes' => (int)$row['free_in_minutes'],
                     'available_for_minutes' => (int)$row['available_for_minutes'],
                     'timestamp' => $row['timestamp']

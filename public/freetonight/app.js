@@ -189,6 +189,8 @@ function displayFreeList(users) {
         const timeSpan = document.createElement('span');
         nameSpan.textContent = user.name;
         activitySpan.textContent = user.activity ? ` (${user.activity})` : '';
+        activitySpan.className = 'activity';
+        activitySpan.title = user.activity || '';
         timeSpan.id = `timer-${idx}`;
         timeSpan.className = 'timestamp';
         listItem.appendChild(nameSpan);
