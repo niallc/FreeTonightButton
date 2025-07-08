@@ -1,86 +1,199 @@
-# I'm Free Tonight - Web App
+# I'm Free Tonight v2.0
 
-A simple web application for a trusted group to indicate availability.
+A simple web application where friends can indicate they are "free tonight" and see who else is available.
 
-## 🏗️ **Directory Structure**
+## Features
 
-The app has been refactored to solve SQLite write permission issues on shared hosting:
+- ✅ Add yourself to the "free tonight" list
+- ✅ Remove yourself from the list
+- ✅ See who else is free tonight
+- ✅ Auto-refresh every 2 minutes
+- ✅ Mobile-first responsive design
+- ✅ Privacy warning for users
+- ✅ Automatic expiration at midnight
+- ✅ Error handling and user feedback
+- ✅ Development version tracking
 
-**Local Development:**
-```
-FreeTonightButton/
-├── public/           # Web-accessible files
-│   ├── index.html
-│   ├── style.css
-│   ├── app.js
-│   ├── api.php
-│   └── test_api.html
-└── private/freetonight/  # Private, writable files
-    └── friends.db
-```
+## Quick Start
 
-**Server Deployment:**
-```
-/home/public/freetonight/     # Web-accessible files
-├── index.html
-├── style.css
-├── app.js
-├── api.php
-└── test_api.html
+### Local Development
 
-/home/private/freetonight/    # Private, writable files
-├── friends.db
-└── php_errors.log
-```
+1. **Start the development server:**
+   ```bash
+   php dev_server.php
+   ```
 
-## 🚀 **Deployment**
+2. **Open your browser:**
+   ```
+   http://localhost:8000/freetonight/
+   ```
 
-### **Step 1: Upload Files**
+3. **Test the application:**
+   - Enter your name and click "I'm Free Tonight!"
+   - Try the "Remove Me" button
+   - Check that the list refreshes automatically
+   - Test on mobile devices
 
-**To `/home/public/freetonight/`:**
-- `index.html`
-- `style.css`
-- `app.js`
-- `api.php`
-- `test_api.html` (optional)
-
-**To `/home/private/freetonight/`:**
-- Create the directory: `mkdir -p /home/private/freetonight`
-- The database and log files will be created automatically
-
-### **Step 2: Set Permissions**
+### Running Tests
 
 ```bash
-# Create private directory
-mkdir -p /home/private/freetonight
-
-# Set directory permissions
-chmod 755 /home/private/freetonight
-
-# If database exists, set file permissions
-chmod 666 /home/private/freetonight/friends.db
+php tests/test_api.php
 ```
 
-## 🔧 **Key Changes in v1.1.0**
+This will test:
+- Adding users to the list
+- Removing users from the list
+- Input validation (empty names, long names, special characters)
+- List retrieval and filtering
+- Expired entries (entries from previous days)
 
-- **Database Location**: Moved from `./friends.db` to `/home/private/freetonight/friends.db`
-- **Error Logs**: Moved to `/home/private/freetonight/php_errors.log`
-- **SQLite Journal Files**: Can now be created in the writable private directory
+## Project Structure
 
-## 🎯 **Why This Fixes the Issue**
+```
+FreeTonightButton2/
+├── private/freetonight/          # Database and logs (auto-created)
+│   ├── friends.db               # SQLite database
+│   └── php_errors.log          # Error log
+├── public/freetonight/          # Web-accessible files
+│   ├── index.html              # Main application page
+│   ├── style.css               # Mobile-first styles
+│   ├── app.js                  # Client-side JavaScript
+│   ├── api.php                 # Backend API endpoint
+│   └── config.php              # Environment configuration
+├── tests/
+│   └── test_api.php            # API test suite
+├── dev_server.php              # Development server script
+├── design.md                   # Design documentation
+└── README.md                   # This file
+```
 
-The original error `SQLSTATE[HY000]: General error: 8 attempt to write a readonly database` occurred because:
+## API Endpoints
 
-1. SQLite needs to create temporary journal files (e.g., `friends.db-journal`) in the same directory as the database
-2. Shared hosting typically doesn't allow write access to the public web root
-3. Moving the database to `/home/private/` provides the necessary write permissions
+### GET /api.php
+Returns the list of users who are free tonight.
 
-## 📝 **Testing**
+**Response:**
+```json
+[
+  {
+    "name": "Alice",
+    "timestamp": 1640995200
+  },
+  {
+    "name": "Bob", 
+    "timestamp": 1640994900
+  }
+]
+```
 
-Use `test_api.html` to verify both GET and SET operations work correctly.
+### POST /api.php
+Add yourself to the "free tonight" list.
 
-## 🔍 **Troubleshooting**
+**Request:**
+```json
+{
+  "name": "Your Name"
+}
+```
 
-- Check `/home/private/freetonight/php_errors.log` for detailed error messages
-- Verify directory permissions: `ls -la /home/private/freetonight/`
-- Test database connectivity: `php -r "echo extension_loaded('sqlite3') ? 'SQLite OK' : 'SQLite missing';"` 
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Status for Your Name updated."
+}
+```
+
+### DELETE /api.php
+Remove yourself from the "free tonight" list.
+
+**Request:**
+```json
+{
+  "name": "Your Name"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Your Name removed from list."
+}
+```
+
+## Development
+
+### Version Tracking
+
+The application displays a version number in the bottom-right corner. Update this in:
+- `public/freetonight/index.html` (line with `v1.0.0`)
+- `public/freetonight/app.js` (APP_VERSION constant)
+
+### Adding Features
+
+1. **Backend changes:** Modify `api.php` and test with `tests/test_api.php`
+2. **Frontend changes:** Update `app.js` and `style.css` as needed
+3. **Database changes:** Update the schema in `api.php` and add migration tests
+
+### Testing Strategy
+
+- **Unit tests:** `tests/test_api.php` covers core API functionality
+- **Manual testing:** Use the development server to test the full application
+- **Mobile testing:** Test on various devices and screen sizes
+- **Error testing:** Try invalid inputs, network failures, etc.
+
+## Deployment
+
+### Local to Server
+
+1. **Upload files:** Copy `public/freetonight/` to your server's web root
+2. **Create private directory:** `mkdir /home/private/freetonight`
+3. **Set permissions:** `chmod 755 /home/private/freetonight`
+4. **Update config:** Edit `config.php` with your domain name
+5. **Test:** Visit your domain/freetonight/
+
+### Environment Configuration
+
+The application automatically detects local vs production environment:
+- **Local:** Uses relative paths from the project structure
+- **Production:** Uses absolute paths on the server
+
+Update `PRODUCTION_HOSTNAME` in `config.php` with your actual domain.
+
+## Security Considerations
+
+- All user input is validated and sanitized
+- Output is HTML-escaped to prevent XSS
+- No authentication (by design for this use case)
+- Privacy warning displayed to users
+- Error messages help with debugging
+
+## Future Development
+
+See `design.md` for planned features:
+- WebSocket support for real-time updates
+- Avatar/profile picture support
+- Status messages and notes
+- Group functionality for different friend circles
+- Historical data tracking
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Database not created:** Check that the private directory is writable
+2. **API errors:** Check `private/freetonight/php_errors.log`
+3. **CORS issues:** Make sure you're accessing via the development server
+4. **Mobile issues:** Test with different browsers and screen sizes
+
+### Debug Mode
+
+For development, you can temporarily enable error display by changing in `config.php`:
+```php
+ini_set('display_errors', 1); // Show errors in browser
+```
+
+## License
+
+This is a personal project for friends to coordinate social activities. 

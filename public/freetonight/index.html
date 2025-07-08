@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>I'm Free Tonight</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app-container">
+        <h1>I'm Free Tonight</h1>
+        
+        <div class="input-section">
+            <input type="text" id="name-input" placeholder="Enter your name" maxlength="50">
+            <div class="button-group">
+                <button id="free-button">I'm Free Tonight!</button>
+                <button id="remove-button">Remove Me</button>
+            </div>
+        </div>
+        
+        <div id="action-feedback"></div>
+        
+        <div class="list-section">
+            <div class="list-header">
+                <h2>Who's Free Tonight</h2>
+                <button id="refresh-button" title="Refresh">🔄</button>
+            </div>
+            <ul id="free-list"></ul>
+        </div>
+        
+        <div id="status-bar">Last updated: Never</div>
+        
+        <div id="privacy-warning">
+            ⚠️ Anyone can see this page and will be able to see anything you enter.
+        </div>
+    </div>
+    
+    <div id="version-info">v1.0.0</div>
+    
+    <script src="app.js"></script>
+</body>
+</html> 

@@ -1,40 +1,72 @@
 #!/bin/bash
 
-# Deployment script for FreeTonight app
-# This script helps set up the proper directory structure on NearlyFreeSpeech
+# Deployment script for NearlyFreeSpeech.net
+# Usage: ./deploy.sh [optional: custom server] [optional: custom username]
+#        ./deploy.sh --setup (to create directories and set permissions)
 
-echo "🚀 FreeTonight App Deployment Script"
-echo "====================================="
+# Default NearlyFreeSpeech.net settings
+DEFAULT_SERVER="ssh.nyc1.nearlyfreespeech.net"
+DEFAULT_USERNAME="niallcardin_niallhome"
+
+# Use provided arguments or defaults
+SERVER=${1:-$DEFAULT_SERVER}
+USERNAME=${2:-$DEFAULT_USERNAME}
+
+# Check if this is a setup run
+if [ "$1" = "--setup" ]; then
+    echo "Setting up directories and permissions..."
+    echo "Server: $SERVER"
+    echo "Username: $USERNAME"
+    echo ""
+    
+    echo "1. Creating private directory on server..."
+    ssh $USERNAME@$SERVER "mkdir -p /home/private/freetonight"
+    
+    echo "2. Setting permissions..."
+    ssh $USERNAME@$SERVER "chmod 755 /home/private/freetonight"
+    ssh $USERNAME@$SERVER "chmod 755 /home/private"
+    
+    echo "✅ Setup complete!"
+    echo "Now you can run ./deploy.sh for normal deployments."
+    exit 0
+fi
+
+echo "Deploying to NearlyFreeSpeech.net..."
+echo "Server: $SERVER"
+echo "Username: $USERNAME"
+echo "Target: $USERNAME@$SERVER:/home/public/freetonight/"
+echo ""
+echo "Note: Skipping directory creation and permissions (already set up)"
+echo "Run './deploy.sh --setup' if you need to recreate directories"
+echo ""
+
+# Check if files exist
+if [ ! -d "public/freetonight" ]; then
+    echo "Error: public/freetonight directory not found!"
+    exit 1
+fi
+
+echo "Uploading public files using rsync..."
+rsync -avz --delete \
+  --exclude='.DS_Store' \
+  --exclude='deploy.sh' \
+  --exclude='*.log' \
+  --exclude='*.db' \
+  public/freetonight/ \
+  $USERNAME@$SERVER:/home/public/freetonight/
 
 echo ""
-echo "📁 Directory Structure:"
-echo "   ./public/           (web-accessible files for upload)"
-echo "   ./private/freetonight/ (private, writable files)"
-
+echo "✅ Deployment complete!"
 echo ""
-echo "📋 Files in ./public/ (upload to /home/public/freetonight/):"
-echo "   ✅ index.html"
-echo "   ✅ style.css" 
-echo "   ✅ app.js"
-echo "   ✅ api.php"
-echo "   ✅ test_api.html (optional)"
-
+echo "Next steps:"
+echo "1. Edit config.php on the server to set your domain name"
+echo "2. Visit your domain to test the application"
+echo "3. Check /home/private/freetonight/php_errors.log for any errors"
 echo ""
-echo "📋 Files in ./private/freetonight/ (upload to /home/private/freetonight/):"
-echo "   ✅ friends.db (will be created automatically)"
-echo "   ✅ php_errors.log (will be created automatically)"
-
+echo "To edit config.php:"
+echo "ssh $USERNAME@$SERVER"
+echo "nano /home/public/freetonight/config.php"
 echo ""
-echo "🔧 Server setup commands (run on server):"
-echo "   mkdir -p /home/private/freetonight"
-echo "   chmod 755 /home/private/freetonight"
-echo "   chmod 666 /home/private/freetonight/friends.db (if exists)"
-
+echo "Change PRODUCTION_HOSTNAME to 'niallcardin.com'"
 echo ""
-echo "🎯 Key Changes:"
-echo "   • Database moved to /home/private/freetonight/friends.db"
-echo "   • Error logs moved to /home/private/freetonight/php_errors.log"
-echo "   • SQLite can now create journal files in writable directory"
-
-echo ""
-echo "✅ Ready for deployment!" 
+echo "Your app will be available at: https://niallcardin.com/freetonight/" 
