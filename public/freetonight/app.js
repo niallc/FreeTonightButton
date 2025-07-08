@@ -78,6 +78,8 @@ function loadSavedName() {
     }
 }
 
+let freeListUsers = [];
+
 async function setFreeStatus() {
     const name = nameInput.value.trim();
     if (!name) {
@@ -88,9 +90,11 @@ async function setFreeStatus() {
     if (!activity) {
         activity = 'up for anything';
     }
-    const freeInMinutes = (parseInt(freeInHoursInput.value, 10) || 0) * 60 + (parseInt(freeInMinutesInput.value, 10) || 0);
-    const availableForMinutes = (parseInt(availableForHoursInput.value, 10) || 0) * 60 + (parseInt(availableForMinutesInput.value, 10) || 0);
-    if (availableForMinutes <= 0) {
+    // Parse input fields, treat blank as null
+    const freeInMinutes = freeInHoursInput.value === '' && freeInMinutesInput.value === '' ? null : (parseInt(freeInHoursInput.value, 10) || 0) * 60 + (parseInt(freeInMinutesInput.value, 10) || 0);
+    const availableForMinutes = availableForHoursInput.value === '' && availableForMinutesInput.value === '' ? null : (parseInt(availableForHoursInput.value, 10) || 0) * 60 + (parseInt(availableForMinutesInput.value, 10) || 0);
+    // Allow blank availableForMinutes (null), but if set, must be > 0
+    if (availableForMinutes !== null && availableForMinutes <= 0) {
         showActionFeedback('Available for must be greater than 0 minutes', 'error');
         return;
     }
@@ -103,8 +107,8 @@ async function setFreeStatus() {
             body: JSON.stringify({
                 name: name,
                 activity: activity,
-                free_in_minutes: freeInMinutes,
-                available_for_minutes: availableForMinutes
+                free_in_minutes: freeInMinutes === null ? 0 : freeInMinutes,
+                available_for_minutes: availableForMinutes === null ? 0 : availableForMinutes
             })
         });
         const data = await response.json();
@@ -154,9 +158,9 @@ async function getFreeList() {
     try {
         const response = await fetch('/freetonight/api.php');
         const data = await response.json();
-        
         if (response.ok) {
-            displayFreeList(data);
+            freeListUsers = data;
+            displayFreeList(freeListUsers);
             lastRefreshTime = Date.now();
             updateTimerDisplay();
         } else {
@@ -170,7 +174,6 @@ async function getFreeList() {
 
 function displayFreeList(users) {
     freeList.innerHTML = '';
-    
     if (users.length === 0) {
         const emptyItem = document.createElement('li');
         emptyItem.textContent = 'No one is free tonight yet';
@@ -179,23 +182,59 @@ function displayFreeList(users) {
         freeList.appendChild(emptyItem);
         return;
     }
-    
-    users.forEach(user => {
+    users.forEach((user, idx) => {
         const listItem = document.createElement('li');
         const nameSpan = document.createElement('span');
         const activitySpan = document.createElement('span');
         const timeSpan = document.createElement('span');
-        
         nameSpan.textContent = user.name;
         activitySpan.textContent = user.activity ? ` (${user.activity})` : '';
-        timeSpan.textContent = formatRelativeTime(user.free_in_minutes, user.available_for_minutes);
+        timeSpan.id = `timer-${idx}`;
         timeSpan.className = 'timestamp';
-        
         listItem.appendChild(nameSpan);
         listItem.appendChild(activitySpan);
         listItem.appendChild(timeSpan);
         freeList.appendChild(listItem);
     });
+    updateAllTimers();
+}
+function updateAllTimers() {
+    freeListUsers.forEach((user, idx) => {
+        const timerSpan = document.getElementById(`timer-${idx}`);
+        if (!timerSpan) return;
+        timerSpan.textContent = formatLiveRelativeTime(user);
+    });
+}
+function formatLiveRelativeTime(user) {
+    // If available_for_minutes is 0 or null, show nothing
+    if (!user.available_for_minutes || user.available_for_minutes <= 0) return '';
+    // Calculate the time left
+    const now = Math.floor(Date.now() / 1000);
+    const posted = user.timestamp;
+    const freeIn = user.free_in_minutes || 0;
+    const availableFor = user.available_for_minutes || 0;
+    const freeStart = posted + freeIn * 60;
+    const freeEnd = freeStart + availableFor * 60;
+    if (now < freeStart) {
+        return `Free in ${formatSeconds(freeStart - now)} (for ${formatSeconds(availableFor * 60)})`;
+    } else if (now < freeEnd) {
+        return `Free now (${formatSeconds(freeEnd - now)} left)`;
+    } else {
+        return 'No longer free';
+    }
+}
+function formatSeconds(totalSeconds) {
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    let out = '';
+    if (h > 0) out += `${h}h`;
+    if (h > 0 && m > 0) out += ' ';
+    if (m > 0) out += `${m}m`;
+    if ((h > 0 || m > 0) && s > 0) out += ' ';
+    if (s > 0) out += `${s}s`;
+    if (out === '') out = '0s';
+    return out;
 }
 
 function formatRelativeTime(freeIn, availableFor) {
