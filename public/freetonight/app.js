@@ -176,7 +176,7 @@ function displayFreeList(users) {
     freeList.innerHTML = '';
     if (users.length === 0) {
         const emptyItem = document.createElement('li');
-        emptyItem.textContent = 'No one is free tonight yet';
+        emptyItem.textContent = 'No one is free yet';
         emptyItem.style.textAlign = 'center';
         emptyItem.style.color = '#666';
         freeList.appendChild(emptyItem);
