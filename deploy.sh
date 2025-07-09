@@ -1,40 +1,49 @@
 #!/bin/bash
 
-# Deployment script for NearlyFreeSpeech.net
-# Usage: ./deploy.sh [optional: custom server] [optional: custom username]
-#        ./deploy.sh --setup (to create directories and set permissions)
+# Deployment script for Free Tonight app
+# 
+# For NearlyFreeSpeech.net (default):
+#   ./deploy.sh
+#   ./deploy.sh ssh.nyc1.nearlyfreespeech.net niallcardin_niallhome
+#
+# For other hosting services, modify the variables below:
+#   ./deploy.sh your-server.com your-username
 
 # Default NearlyFreeSpeech.net settings
 DEFAULT_SERVER="ssh.nyc1.nearlyfreespeech.net"
 DEFAULT_USERNAME="niallcardin_niallhome"
+DEFAULT_PUBLIC_PATH="/home/public/freetonight/"
+DEFAULT_PRIVATE_PATH="/home/private/freetonight/"
 
 # Use provided arguments or defaults
 SERVER=${1:-$DEFAULT_SERVER}
 USERNAME=${2:-$DEFAULT_USERNAME}
+PUBLIC_PATH=${3:-$DEFAULT_PUBLIC_PATH}
+PRIVATE_PATH=${4:-$DEFAULT_PRIVATE_PATH}
 
 # Check if this is a setup run
 if [ "$1" = "--setup" ]; then
     echo "Setting up directories and permissions..."
     echo "Server: $SERVER"
     echo "Username: $USERNAME"
+    echo "Private path: $PRIVATE_PATH"
     echo ""
     
     echo "1. Creating private directory on server..."
-    ssh $USERNAME@$SERVER "mkdir -p /home/private/freetonight"
+    ssh $USERNAME@$SERVER "mkdir -p $PRIVATE_PATH"
     
     echo "2. Setting permissions..."
-    ssh $USERNAME@$SERVER "chmod 755 /home/private/freetonight"
-    ssh $USERNAME@$SERVER "chmod 755 /home/private"
+    ssh $USERNAME@$SERVER "chmod 755 $PRIVATE_PATH"
     
     echo "✅ Setup complete!"
     echo "Now you can run ./deploy.sh for normal deployments."
     exit 0
 fi
 
-echo "Deploying to NearlyFreeSpeech.net..."
+echo "Deploying Free Tonight app..."
 echo "Server: $SERVER"
 echo "Username: $USERNAME"
-echo "Target: $USERNAME@$SERVER:/home/public/freetonight/"
+echo "Target: $USERNAME@$SERVER:$PUBLIC_PATH"
 echo ""
 echo "Note: Skipping directory creation and permissions (already set up)"
 echo "Run './deploy.sh --setup' if you need to recreate directories"
@@ -53,8 +62,12 @@ rsync -avz --delete \
   --exclude='*.log' \
   --exclude='*.db' \
   public/freetonight/ \
-  $USERNAME@$SERVER:/home/public/freetonight/
+  $USERNAME@$SERVER:$PUBLIC_PATH
 
 echo ""
 echo "✅ Deployment complete!"
 echo ""
+echo "Next steps:"
+echo "1. Configure config.php with your domain name"
+echo "2. Test the application at your domain"
+echo "3. Check error logs if needed"

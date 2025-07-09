@@ -79,7 +79,7 @@ Add `?debug=true` to the URL for detailed console logging during development.
 
 ## Deployment
 
-See `DEPLOYMENT.md` for detailed deployment instructions to NearlyFreeSpeech.net.
+See `DEPLOYMENT.md` for deployment instructions to any web hosting service. The app is currently deployed at https://niallcardin.com/freetonight/ as an example.
 
 ## Future Development
 

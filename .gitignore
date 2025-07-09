@@ -4,6 +4,10 @@ report.md
 php_errors.log 
 version.txt
 
+# Private deployment notes
+DEPLOYMENT_NFS.md
+nfsdeploy.sh
+
 # macOS
 .DS_Store
 .DS_Store?
