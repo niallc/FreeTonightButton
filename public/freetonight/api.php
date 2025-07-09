@@ -40,7 +40,8 @@ try {
         free_in_minutes INTEGER DEFAULT 0,
         available_for_minutes INTEGER DEFAULT 240,
         timestamp INTEGER NOT NULL,
-        group_name TEXT NOT NULL DEFAULT "default"
+        group_name TEXT NOT NULL DEFAULT "default",
+        UNIQUE(name, group_name)
     )');
     
     // Add group_name column to existing tables if it doesn't exist
@@ -49,6 +50,14 @@ try {
     if (!in_array('group_name', $columns)) {
         $pdo->exec('ALTER TABLE status ADD COLUMN group_name TEXT NOT NULL DEFAULT "default"');
         smart_log(LOG_INFO, "Added group_name column to status table");
+        
+        // Add unique constraint for existing tables
+        try {
+            $pdo->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_status_name_group ON status(name, group_name)');
+            smart_log(LOG_INFO, "Added unique constraint for name and group_name");
+        } catch (PDOException $e) {
+            smart_log(LOG_WARN, "Could not add unique constraint (may already exist)", ['error' => $e->getMessage()]);
+        }
     }
     
     // Groups metadata table
@@ -492,4 +501,4 @@ switch ($_SERVER['REQUEST_METHOD']) {
         break;
 }
 
-smart_log(LOG_INFO, "=== API.PHP COMPLETE ==="); 
+smart_log(LOG_INFO, "=== API.PHP COMPLETE ==="); // Temporary marker to force transfer
