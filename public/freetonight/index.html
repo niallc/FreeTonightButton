@@ -41,7 +41,7 @@
         
         <div class="list-section">
             <div class="list-header">
-                <h2>Who's Free</h2>
+                <h2 id="group-title">Who's Free</h2>
             </div>
             <ul id="free-list"></ul>
         </div>
@@ -51,12 +51,45 @@
             <button id="refresh-button" title="Refresh">🔄</button>
         </div>
         
+        <!-- Group Management Section -->
+        <div id="group-management" style="display:none;">
+            <div class="group-section">
+                <button id="back-to-default-button" type="button">← Back to Default Group</button>
+            </div>
+            <div class="group-section">
+                <button id="delete-group-button" type="button">Delete This Group</button>
+            </div>
+        </div>
+        
+        <!-- Create Group Button (always visible) -->
+        <div class="create-group-section">
+            <button id="create-group-button" type="button">Create New Group</button>
+        </div>
+        
         <div id="privacy-warning">
             ⚠️ Anyone can see this page and will be able to see anything you enter and make changes to any content on the page.
         </div>
     </div>
     
-    <div id="version-info">v1.2.2</div>
+    <div id="version-info">v1.3.1</div>
+    
+    <!-- Group Creation Modal -->
+    <div id="group-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h3>Create New Group</h3>
+            <p>Create a separate group for your friends. Only alphanumeric characters, underscores, and hyphens are allowed in group names.</p>
+            <form id="create-group-form">
+                <label for="group-name-input">Group Name:</label>
+                <input type="text" id="group-name-input" placeholder="e.g. my-friends" maxlength="20" pattern="[a-zA-Z0-9_-]+" required>
+                <label for="group-display-input">Display Name (optional):</label>
+                <input type="text" id="group-display-input" placeholder="e.g. My Friends" maxlength="50">
+                <div class="modal-buttons">
+                    <button type="submit">Create Group</button>
+                    <button type="button" id="cancel-create-group">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
     
     <script src="/freetonight/app.js"></script>
 </body>

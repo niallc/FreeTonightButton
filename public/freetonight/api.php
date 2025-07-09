@@ -11,6 +11,11 @@ define('GRACE_PERIOD_SECONDS', 3600); // 1 hour after end time
 define('MAX_MIDNIGHT_MINUTES', 1440); // 24 hours (local timezone)
 define('SECONDS_PER_MINUTE', 60);
 
+// Group-related constants
+define('MAX_GROUP_NAME_LENGTH', 20);
+define('DEFAULT_GROUP_NAME', 'default');
+define('RESERVED_GROUP_NAMES', ['main', 'admin', 'test', 'api', 'default']);
+
 smart_log(LOG_INFO, "=== API.PHP STARTING ===");
 
 smart_log(LOG_DEBUG, "Config loaded successfully");
@@ -24,16 +29,40 @@ try {
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     smart_log(LOG_DEBUG, "PDO error mode set");
     
-    // Create table if it doesn't exist
-    smart_log(LOG_DEBUG, "Creating table if it doesn't exist");
+    // Create tables if they don't exist
+    smart_log(LOG_DEBUG, "Creating tables if they don't exist");
+    
+    // Main status table (add group_name column if it doesn't exist)
     $pdo->exec('CREATE TABLE IF NOT EXISTS status (
         id INTEGER PRIMARY KEY,
-        name TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
         activity TEXT DEFAULT "Anything",
         free_in_minutes INTEGER DEFAULT 0,
         available_for_minutes INTEGER DEFAULT 240,
-        timestamp INTEGER NOT NULL
+        timestamp INTEGER NOT NULL,
+        group_name TEXT NOT NULL DEFAULT "default"
     )');
+    
+    // Add group_name column to existing tables if it doesn't exist
+    $result = $pdo->query("PRAGMA table_info(status)");
+    $columns = $result->fetchAll(PDO::FETCH_COLUMN, 1);
+    if (!in_array('group_name', $columns)) {
+        $pdo->exec('ALTER TABLE status ADD COLUMN group_name TEXT NOT NULL DEFAULT "default"');
+        smart_log(LOG_INFO, "Added group_name column to status table");
+    }
+    
+    // Groups metadata table
+    $pdo->exec('CREATE TABLE IF NOT EXISTS groups (
+        id INTEGER PRIMARY KEY,
+        name TEXT UNIQUE NOT NULL,
+        display_name TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+    )');
+    
+    // Insert default group if it doesn't exist
+    $stmt = $pdo->prepare('INSERT OR IGNORE INTO groups (name, display_name, created_at) VALUES (?, ?, ?)');
+    $stmt->execute([DEFAULT_GROUP_NAME, 'Default Group', time()]);
+    
     smart_log(LOG_DEBUG, "Table creation/check completed");
     
 } catch (PDOException $e) {
@@ -103,6 +132,46 @@ function isUntilMidnightEntry($freeInMinutes, $availableForMinutes) {
 }
 
 /**
+ * Validate and sanitize group name
+ */
+function validateGroupName($groupName) {
+    smart_log(LOG_DEBUG, "Validating group name", ['input' => $groupName]);
+    
+    $groupName = trim($groupName ?? '');
+    if ($groupName === '') {
+        smart_log(LOG_DEBUG, "Group name validation failed: empty");
+        return ['error' => 'Group name is required'];
+    }
+    
+    // Check length
+    if (strlen($groupName) > MAX_GROUP_NAME_LENGTH) {
+        smart_log(LOG_DEBUG, "Group name validation failed: too long", [
+            'length' => strlen($groupName),
+            'max' => MAX_GROUP_NAME_LENGTH
+        ]);
+        return ['error' => 'Group name too long (max ' . MAX_GROUP_NAME_LENGTH . ' characters)'];
+    }
+    
+    // Check for reserved names
+    if (in_array(strtolower($groupName), array_map('strtolower', RESERVED_GROUP_NAMES))) {
+        smart_log(LOG_DEBUG, "Group name validation failed: reserved name", [
+            'name' => $groupName,
+            'reserved_names' => RESERVED_GROUP_NAMES
+        ]);
+        return ['error' => 'Group name is reserved'];
+    }
+    
+    // Check for valid characters (alphanumeric + underscore + hyphen)
+    if (!preg_match('/^[a-zA-Z0-9_-]+$/', $groupName)) {
+        smart_log(LOG_DEBUG, "Group name validation failed: invalid characters", ['name' => $groupName]);
+        return ['error' => 'Group name can only contain letters, numbers, underscores, and hyphens'];
+    }
+    
+    smart_log(LOG_DEBUG, "Group name validation passed", ['name' => $groupName]);
+    return ['group_name' => $groupName];
+}
+
+/**
  * Sanitize and validate user input
  */
 function validateUserInput($input) {
@@ -124,11 +193,15 @@ function validateUserInput($input) {
     $availableForMinutes = isset($input['available_for_minutes']) && is_numeric($input['available_for_minutes']) 
         ? (int)$input['available_for_minutes'] : DEFAULT_AVAILABLE_FOR_MINUTES;
     
+    // Get group name (default to 'default' if not specified)
+    $groupName = isset($input['group_name']) ? trim($input['group_name']) : DEFAULT_GROUP_NAME;
+    
     return [
         'name' => $name,
         'activity' => $activity,
         'free_in_minutes' => $freeInMinutes,
-        'available_for_minutes' => $availableForMinutes
+        'available_for_minutes' => $availableForMinutes,
+        'group_name' => $groupName
     ];
 }
 
@@ -146,13 +219,14 @@ switch ($_SERVER['REQUEST_METHOD']) {
         }
         
         try {
-            $stmt = $pdo->prepare('REPLACE INTO status (name, activity, free_in_minutes, available_for_minutes, timestamp) VALUES (:name, :activity, :free_in_minutes, :available_for_minutes, :timestamp)');
+            $stmt = $pdo->prepare('REPLACE INTO status (name, activity, free_in_minutes, available_for_minutes, timestamp, group_name) VALUES (:name, :activity, :free_in_minutes, :available_for_minutes, :timestamp, :group_name)');
             $stmt->execute([
                 'name' => $validated['name'],
                 'activity' => $validated['activity'],
                 'free_in_minutes' => $validated['free_in_minutes'],
                 'available_for_minutes' => $validated['available_for_minutes'],
-                'timestamp' => time()
+                'timestamp' => time(),
+                'group_name' => $validated['group_name']
             ]);
             
             smart_log(LOG_INFO, "User status updated", [
@@ -188,10 +262,11 @@ switch ($_SERVER['REQUEST_METHOD']) {
         }
         
         $name = trim(strip_tags($input['name']));
+        $groupName = isset($input['group_name']) ? trim($input['group_name']) : DEFAULT_GROUP_NAME;
         
         try {
-            $stmt = $pdo->prepare('DELETE FROM status WHERE name = :name');
-            $stmt->execute(['name' => $name]);
+            $stmt = $pdo->prepare('DELETE FROM status WHERE name = :name AND group_name = :group_name');
+            $stmt->execute(['name' => $name, 'group_name' => $groupName]);
             
             if ($stmt->rowCount() > 0) {
                 smart_log(LOG_INFO, "User removed from list", ['name' => $name]);
@@ -218,11 +293,38 @@ switch ($_SERVER['REQUEST_METHOD']) {
         
     case 'GET':
         smart_log(LOG_DEBUG, "Processing GET request");
+        
+        // Check if this is a group management request
+        if (isset($_GET['action'])) {
+            switch ($_GET['action']) {
+                case 'list_groups':
+                    try {
+                        $stmt = $pdo->prepare('SELECT name, display_name, created_at FROM groups ORDER BY created_at DESC');
+                        $stmt->execute();
+                        $groups = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                        echo json_encode($groups);
+                    } catch (PDOException $e) {
+                        smart_log(LOG_ERROR, "Database error listing groups", ['error' => $e->getMessage()]);
+                        http_response_code(500);
+                        echo json_encode(['error' => 'Failed to list groups']);
+                    }
+                    break;
+                    
+                default:
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Invalid action']);
+                    break;
+            }
+            break;
+        }
+        
+        // Regular status list request
         $start_of_day = strtotime('today', time());
+        $groupName = $_GET['group'] ?? DEFAULT_GROUP_NAME;
         
         try {
-            $stmt = $pdo->prepare('SELECT name, activity, free_in_minutes, available_for_minutes, timestamp FROM status WHERE timestamp >= :start_of_day ORDER BY timestamp DESC');
-            $stmt->execute(['start_of_day' => $start_of_day]);
+            $stmt = $pdo->prepare('SELECT name, activity, free_in_minutes, available_for_minutes, timestamp FROM status WHERE timestamp >= :start_of_day AND group_name = :group_name ORDER BY timestamp DESC');
+            $stmt->execute(['start_of_day' => $start_of_day, 'group_name' => $groupName]);
             
             $users = [];
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
@@ -242,14 +344,144 @@ switch ($_SERVER['REQUEST_METHOD']) {
                 }
             }
             
-            smart_log(LOG_DEBUG, "Retrieved user list", ['count' => count($users)]);
+            smart_log(LOG_DEBUG, "Retrieved user list", ['count' => count($users), 'group' => $groupName]);
             echo json_encode($users);
         } catch (PDOException $e) {
-            smart_log(LOG_ERROR, "Database error during GET", [
-                'error' => $e->getMessage()
-            ]);
+            smart_log(LOG_ERROR, "Database error during GET", ['error' => $e->getMessage()]);
             http_response_code(500);
             echo json_encode(['error' => 'Failed to retrieve status list']);
+        }
+        break;
+        
+    case 'PUT':
+        smart_log(LOG_DEBUG, "Processing PUT request");
+        $input = json_decode(file_get_contents('php://input'), true);
+        
+        if (!isset($input['action'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Action is required']);
+            exit;
+        }
+        
+        switch ($input['action']) {
+            case 'create_group':
+                smart_log(LOG_DEBUG, "Creating group", [
+                    'group_name' => $input['group_name'] ?? 'null',
+                    'display_name' => $input['display_name'] ?? 'null'
+                ]);
+                
+                $validated = validateGroupName($input['group_name'] ?? '');
+                if (isset($validated['error'])) {
+                    smart_log(LOG_DEBUG, "Group creation failed: validation error", ['error' => $validated['error']]);
+                    http_response_code(400);
+                    echo json_encode(['error' => $validated['error']]);
+                    exit;
+                }
+                
+                $displayName = trim($input['display_name'] ?? $validated['group_name']);
+                
+                try {
+                    // Check if group already exists (case-insensitive)
+                    $stmt = $pdo->prepare('SELECT name FROM groups WHERE LOWER(name) = LOWER(?)');
+                    $stmt->execute([$validated['group_name']]);
+                    
+                    if ($stmt->fetch()) {
+                        smart_log(LOG_DEBUG, "Group creation failed: name already taken", ['name' => $validated['group_name']]);
+                        http_response_code(400);
+                        echo json_encode(['error' => 'Group name already taken']);
+                        exit;
+                    }
+                    
+                    // Create the group
+                    $stmt = $pdo->prepare('INSERT INTO groups (name, display_name, created_at) VALUES (?, ?, ?)');
+                    $stmt->execute([$validated['group_name'], $displayName, time()]);
+                    
+                    smart_log(LOG_INFO, "Group created", [
+                        'name' => $validated['group_name'],
+                        'display_name' => $displayName
+                    ]);
+                    
+                    echo json_encode([
+                        'success' => true,
+                        'message' => "Group '{$displayName}' created successfully.",
+                        'group_name' => $validated['group_name']
+                    ]);
+                } catch (PDOException $e) {
+                    smart_log(LOG_ERROR, "Database error creating group", [
+                        'error' => $e->getMessage(),
+                        'group_name' => $validated['group_name']
+                    ]);
+                    http_response_code(500);
+                    echo json_encode(['error' => 'Failed to create group']);
+                }
+                break;
+                
+            case 'delete_group':
+                smart_log(LOG_DEBUG, "Deleting group", [
+                    'group_name' => $input['group_name'] ?? 'null'
+                ]);
+                
+                $validated = validateGroupName($input['group_name'] ?? '');
+                if (isset($validated['error'])) {
+                    smart_log(LOG_DEBUG, "Group deletion failed: validation error", ['error' => $validated['error']]);
+                    http_response_code(400);
+                    echo json_encode(['error' => $validated['error']]);
+                    exit;
+                }
+                
+                // Prevent deletion of default group
+                if ($validated['group_name'] === DEFAULT_GROUP_NAME) {
+                    smart_log(LOG_DEBUG, "Group deletion failed: cannot delete default group", ['name' => $validated['group_name']]);
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Cannot delete the default group']);
+                    exit;
+                }
+                
+                try {
+                    // Delete all status entries for this group
+                    $stmt = $pdo->prepare('DELETE FROM status WHERE group_name = ?');
+                    $stmt->execute([$validated['group_name']]);
+                    $deletedStatuses = $stmt->rowCount();
+                    smart_log(LOG_DEBUG, "Deleted status entries for group", [
+                        'group_name' => $validated['group_name'],
+                        'count' => $deletedStatuses
+                    ]);
+                    
+                    // Delete the group itself
+                    $stmt = $pdo->prepare('DELETE FROM groups WHERE name = ?');
+                    $stmt->execute([$validated['group_name']]);
+                    $groupDeleted = $stmt->rowCount() > 0;
+                    
+                    if (!$groupDeleted) {
+                        smart_log(LOG_DEBUG, "Group deletion failed: group not found", ['name' => $validated['group_name']]);
+                        http_response_code(404);
+                        echo json_encode(['error' => 'Group not found']);
+                        exit;
+                    }
+                    
+                    smart_log(LOG_INFO, "Group deleted", [
+                        'group_name' => $validated['group_name'],
+                        'deleted_statuses' => $deletedStatuses
+                    ]);
+                    
+                    echo json_encode([
+                        'success' => true,
+                        'message' => "Group deleted successfully. Removed {$deletedStatuses} status entries."
+                    ]);
+                } catch (PDOException $e) {
+                    smart_log(LOG_ERROR, "Database error deleting group", [
+                        'error' => $e->getMessage(),
+                        'group_name' => $validated['group_name']
+                    ]);
+                    http_response_code(500);
+                    echo json_encode(['error' => 'Failed to delete group']);
+                }
+                break;
+                
+            default:
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid action']);
+                break;
         }
         break;
         

@@ -8,25 +8,55 @@ const GRACE_PERIOD_SECONDS = 3600; // 1 hour after end time
 const REFRESH_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 const UPDATE_INTERVAL_MS = 1000; // 1 second
 
+// Debug logging system
+const DEBUG_MODE = window.location.search.includes('debug=true');
+function debugLog(message, ...args) {
+    if (DEBUG_MODE) {
+        console.log(`🔍 ${message}`, ...args);
+    }
+}
+
 // DOM elements
 let nameInput, activityInput, freeInHoursInput, freeInMinutesInput, availableForHoursInput, availableForMinutesInput;
 let freeButton, removeButton, refreshButton, actionFeedback, statusBar, freeList;
 let toggleOptionsButton, moreOptionsDiv;
+let createGroupButton, deleteGroupButton, groupModal, groupTitle, groupManagement;
+let groupNameInput, groupDisplayInput, createGroupForm, cancelCreateGroupButton, backToDefaultButton;
 
 // Timers
 let refreshTimer, updateTimer;
 let lastRefreshTime = 0;
 
+// Group state
+let currentGroup = 'default';
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
+    debugLog('DOMContentLoaded fired');
+    
     initializeElements();
     setupEventListeners();
     setupTimers();
     loadSavedName();
+    
+    // Handle initial group from URL hash
+    const hash = window.location.hash.slice(1);
+    debugLog('Initial hash:', hash);
+    if (hash) {
+        currentGroup = hash;
+        debugLog('Set currentGroup to:', currentGroup);
+    } else {
+        debugLog('No hash, using default group');
+    }
+    
+    debugLog('About to call updateGroupUI with currentGroup:', currentGroup);
+    updateGroupUI();
     getFreeList(); // Initial load
 });
 
 function initializeElements() {
+    debugLog('Initializing elements...');
+    
     nameInput = document.getElementById('name-input');
     toggleOptionsButton = document.getElementById('toggle-options');
     moreOptionsDiv = document.getElementById('more-options');
@@ -41,6 +71,25 @@ function initializeElements() {
     actionFeedback = document.getElementById('action-feedback');
     statusBar = document.getElementById('status-bar');
     freeList = document.getElementById('free-list');
+    
+    // Group management elements
+    createGroupButton = document.getElementById('create-group-button');
+    deleteGroupButton = document.getElementById('delete-group-button');
+    groupModal = document.getElementById('group-modal');
+    groupTitle = document.getElementById('group-title');
+    groupManagement = document.getElementById('group-management');
+    groupNameInput = document.getElementById('group-name-input');
+    groupDisplayInput = document.getElementById('group-display-input');
+    createGroupForm = document.getElementById('create-group-form');
+    cancelCreateGroupButton = document.getElementById('cancel-create-group');
+    backToDefaultButton = document.getElementById('back-to-default-button');
+    
+    debugLog('Element initialization results:', {
+        createGroupButton: !!createGroupButton,
+        deleteGroupButton: !!deleteGroupButton,
+        groupManagement: !!groupManagement,
+        backToDefaultButton: !!backToDefaultButton
+    });
 }
 
 function setupEventListeners() {
@@ -68,6 +117,16 @@ function setupEventListeners() {
     freeButton.addEventListener('click', setFreeStatus);
     removeButton.addEventListener('click', removeStatus);
     refreshButton.addEventListener('click', getFreeList);
+    
+    // Group management event listeners
+    createGroupButton.addEventListener('click', showCreateGroupModal);
+    deleteGroupButton.addEventListener('click', deleteCurrentGroup);
+    cancelCreateGroupButton.addEventListener('click', hideCreateGroupModal);
+    createGroupForm.addEventListener('submit', createGroup);
+    backToDefaultButton.addEventListener('click', goToDefaultGroup);
+    
+    // Handle hash changes for group switching
+    window.addEventListener('hashchange', handleHashChange);
 }
 
 function setupTimers() {
@@ -82,6 +141,157 @@ function loadSavedName() {
     const savedName = localStorage.getItem('freetonight_name');
     if (savedName) {
         nameInput.value = savedName;
+    }
+}
+
+// Group management functions
+function handleHashChange() {
+    const hash = window.location.hash.slice(1); // Remove the #
+    debugLog('Hash changed to:', hash, 'currentGroup was:', currentGroup);
+    
+    // Handle empty hash (default group)
+    if (!hash && currentGroup !== 'default') {
+        currentGroup = 'default';
+        debugLog('Updated currentGroup to default');
+        updateGroupUI();
+        getFreeList();
+    }
+    // Handle new hash
+    else if (hash && hash !== currentGroup) {
+        currentGroup = hash;
+        debugLog('Updated currentGroup to:', currentGroup);
+        updateGroupUI();
+        getFreeList();
+    } else {
+        debugLog('No change needed');
+    }
+}
+
+function updateGroupUI() {
+    debugLog('updateGroupUI called with currentGroup:', currentGroup);
+    
+    if (currentGroup === 'default') {
+        debugLog('Setting up default group UI');
+        groupTitle.textContent = 'Who\'s Free';
+        if (groupManagement) {
+            groupManagement.style.display = 'none';
+            debugLog('Hidden group management');
+        } else {
+            debugLog('ERROR: groupManagement element not found!');
+        }
+    } else {
+        debugLog('Setting up custom group UI for:', currentGroup);
+        groupTitle.textContent = `Who's Free - ${currentGroup}`;
+        if (groupManagement) {
+            groupManagement.style.display = 'block';
+            debugLog('Showed group management');
+        } else {
+            debugLog('ERROR: groupManagement element not found!');
+        }
+    }
+}
+
+function goToDefaultGroup() {
+    debugLog('Going to default group');
+    currentGroup = 'default';
+    window.location.hash = '';
+    updateGroupUI();
+    getFreeList();
+}
+
+function showCreateGroupModal() {
+    groupModal.style.display = 'flex';
+    groupNameInput.focus();
+}
+
+function hideCreateGroupModal() {
+    groupModal.style.display = 'none';
+    groupNameInput.value = '';
+    groupDisplayInput.value = '';
+}
+
+async function createGroup(e) {
+    e.preventDefault();
+    
+    const groupName = groupNameInput.value.trim();
+    const displayName = groupDisplayInput.value.trim() || groupName;
+    
+    if (!groupName) {
+        showActionFeedback('Please enter a group name', 'error');
+        return;
+    }
+    
+    // Validate group name format
+    if (!/^[a-zA-Z0-9_-]+$/.test(groupName)) {
+        showActionFeedback('Group name can only contain letters, numbers, underscores, and hyphens', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/freetonight/api.php', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: 'create_group',
+                group_name: groupName,
+                display_name: displayName
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showActionFeedback(data.message, 'success');
+            hideCreateGroupModal();
+            
+            // Switch to the new group
+            window.location.hash = groupName;
+        } else {
+            showActionFeedback(data.error || 'Failed to create group', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showActionFeedback('Network error creating group - please try again', 'error');
+    }
+}
+
+async function deleteCurrentGroup() {
+    if (currentGroup === 'default') {
+        showActionFeedback('Cannot delete the default group', 'error');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to delete the group "${currentGroup}"? This will permanently delete all data in this group.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/freetonight/api.php', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: 'delete_group',
+                group_name: currentGroup
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showActionFeedback(data.message, 'success');
+            
+            // Switch back to default group
+            window.location.hash = '';
+        } else {
+            showActionFeedback(data.error || 'Failed to delete group', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showActionFeedback('Network error deleting group - please try again', 'error');
     }
 }
 
@@ -158,7 +368,8 @@ async function setFreeStatus() {
                 name: name,
                 activity: activity,
                 free_in_minutes: freeInMinutes,
-                available_for_minutes: availableForMinutes
+                available_for_minutes: availableForMinutes,
+                group_name: currentGroup
             })
         });
         const data = await response.json();
@@ -187,7 +398,10 @@ async function removeStatus() {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ name: name })
+            body: JSON.stringify({ 
+                name: name,
+                group_name: currentGroup
+            })
         });
         
         const data = await response.json();
@@ -206,7 +420,11 @@ async function removeStatus() {
 
 async function getFreeList() {
     try {
-        const response = await fetch('/freetonight/api.php');
+        const url = currentGroup === 'default' 
+            ? '/freetonight/api.php'
+            : `/freetonight/api.php?group=${encodeURIComponent(currentGroup)}`;
+            
+        const response = await fetch(url);
         const data = await response.json();
         if (response.ok) {
             freeListUsers = data;
