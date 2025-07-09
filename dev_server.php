@@ -1,11 +1,11 @@
 <?php
 /**
- * Simple development server for Free Tonight app
+ * Development server for Free Tonight app
  * Run with: php dev_server.php
  */
 
 echo "Starting Free Tonight development server...\n";
-echo "Server will be available at: http://localhost:8000/freetonight/\n";
+echo "Server will be available at: http://localhost:8002/freetonight/\n";
 echo "Press Ctrl+C to stop the server\n\n";
 
 // Change to the public directory

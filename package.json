@@ -1,0 +1,33 @@
+{
+  "name": "free-tonight-button",
+  "version": "1.3.1",
+  "description": "A simple web application where friends can indicate they are 'free tonight' and see who else is available",
+  "main": "public/freetonight/index.html",
+  "scripts": {
+    "start": "php dev_server.php",
+    "test": "./run_all_tests.sh",
+    "test:unit": "php tests/test_api.php",
+    "test:groups": "php tests/test_groups_api.php",
+    "test:http": "php tests/test_groups_http.php",
+    "test:js": "node tests/test_javascript.js",
+    "deploy": "./deploy.sh"
+  },
+  "keywords": [
+    "php",
+    "sqlite",
+    "javascript",
+    "social",
+    "coordination",
+    "friends"
+  ],
+  "author": "Niall Cardin",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/free-tonight-button.git"
+  },
+  "engines": {
+    "node": ">=14.0.0",
+    "php": ">=7.4.0"
+  }
+} 

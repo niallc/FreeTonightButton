@@ -1,19 +1,15 @@
 # Deployment to NearlyFreeSpeech.net
 
-This guide covers deploying the "I'm Free Tonight" app to NearlyFreeSpeech.net hosting.
+This guide covers deploying the "I'm Free Tonight" app (v1.3.1) to NearlyFreeSpeech.net hosting.
 
-## NearlyFreeSpeech.net Directory Structure
+## Directory Structure
 
-NearlyFreeSpeech.net uses this structure:
+NearlyFreeSpeech.net uses:
 - **Public files:** `/home/public/` (accessible via web)
 - **Private files:** `/home/private/` (not web-accessible)
 - **Your domain:** `niallcardin.com` with subdirectory `/freetonight/`
 
-## Step 1: Prepare Your Domain
-
-The application will be available at: `https://niallcardin.com/freetonight/`
-
-## Step 2: Deploy Using the Script
+## Deployment
 
 ```bash
 # Deploy with default settings (recommended)
@@ -26,9 +22,9 @@ The application will be available at: `https://niallcardin.com/freetonight/`
 The script will:
 1. Create `/home/private/freetonight/` directory
 2. Set proper permissions
-3. Upload public files using rsync (excluding logs, databases, etc.)
+3. Upload public files using rsync
 
-## Step 3: Configure the Application
+## Configuration
 
 1. **Edit `config.php`:**
    ```bash
@@ -41,7 +37,7 @@ The script will:
    define('PRODUCTION_HOSTNAME', 'niallcardin.com');
    ```
 
-## Step 4: Test the Deployment
+## Testing
 
 1. **Visit your app:** `https://niallcardin.com/freetonight/`
 2. **Test the API:** `https://niallcardin.com/freetonight/api.php`
@@ -51,35 +47,23 @@ The script will:
 
 ### Common Issues
 
-1. **404 Errors:**
-   - Check that files are in `/home/public/freetonight/`
-   - Verify domain configuration in `config.php`
-
-2. **Database Errors:**
-   - Check that `/home/private/freetonight/` exists and is writable
-   - Verify permissions: `chmod 755 /home/private/freetonight`
-
-3. **Permission Errors:**
-   ```bash
-   ssh niallcardin_niallhome@ssh.nyc1.nearlyfreespeech.net
-   ls -la /home/private/freetonight
-   chmod 755 /home/private/freetonight
-   ```
+1. **404 Errors:** Check that files are in `/home/public/freetonight/`
+2. **Database Errors:** Verify `/home/private/freetonight/` exists and is writable
+3. **Permission Errors:** Run `chmod 755 /home/private/freetonight`
 
 ### Debug Mode
 
-For troubleshooting, temporarily enable error display:
+For troubleshooting, temporarily enable error display in `config.php`:
 ```php
-// In public/freetonight/config.php, change:
-ini_set('display_errors', 1); // Show errors in browser
-define('DEBUG_MODE', true);   // Enable debug logging
+ini_set('display_errors', 1);
+define('DEBUG_MODE', true);
 ```
 
-**Remember to set them back after debugging!**
+**Remember to disable after debugging!**
 
 ## File Structure on Server
 
-After deployment, your server should have:
+After deployment:
 ```
 /home/public/freetonight/
 ├── index.html
@@ -93,33 +77,9 @@ After deployment, your server should have:
 └── php_errors.log (auto-created)
 ```
 
-## Security Notes
-
-- The private directory (`/home/private/freetonight/`) is not web-accessible
-- Database and logs are stored securely
-- All user input is validated and sanitized
-- Error messages help with debugging but don't expose sensitive info
-
-## Updating the Application
+## Updating
 
 To update the app:
 1. Run `./deploy.sh` to upload new files
 2. Update version numbers in `index.html` and `app.js`
-3. Test the application
-4. Check error logs if issues arise
-
-## Manual Deployment (Alternative)
-
-If you prefer manual upload:
-
-1. **Upload files via SFTP:**
-   - Upload `public/freetonight/*` to `/home/public/freetonight/`
-
-2. **Create private directory:**
-   ```bash
-   ssh niallcardin_niallhome@ssh.nyc1.nearlyfreespeech.net
-   mkdir -p /home/private/freetonight
-   chmod 755 /home/private/freetonight
-   ```
-
-3. **Configure and test as above** 
+3. Test the application 

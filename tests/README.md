@@ -13,27 +13,12 @@ This project uses a simple but effective testing strategy that works across loca
 
 ## Running Tests
 
-### Local Development
-
 ```bash
 # Run all tests
 php tests/test_api.php
 
 # Run with verbose output
 php tests/test_api.php --verbose
-```
-
-### Staging Environment
-
-```bash
-# SSH into staging server
-ssh user@staging.niallcardin.com
-
-# Navigate to project directory
-cd /path/to/freetonight
-
-# Run tests
-php tests/test_api.php
 ```
 
 ## Test Database Strategy
@@ -92,14 +77,6 @@ private function testNewFeature() {
 }
 ```
 
-## Continuous Integration
-
-For automated testing, consider:
-
-1. **GitHub Actions** for local development
-2. **Staging deployment** with automatic test runs
-3. **Pre-deployment checks** before production releases
-
 ## Troubleshooting
 
 ### Common Issues
@@ -110,10 +87,7 @@ For automated testing, consider:
 
 ### Debug Mode
 
-Tests automatically run in debug mode when `DEBUG_MODE=true` in `config.php`. This provides:
-- Detailed error logging
-- Database connection information
-- Path resolution details
+Tests automatically run in debug mode when `DEBUG_MODE=true` in `config.php`.
 
 ## Best Practices
 
