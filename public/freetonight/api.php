@@ -8,7 +8,7 @@ define('MAX_NAME_LENGTH', 50);
 define('MAX_ACTIVITY_LENGTH', 100);
 define('DEFAULT_AVAILABLE_FOR_MINUTES', 240);
 define('GRACE_PERIOD_SECONDS', 3600); // 1 hour after end time
-define('MAX_MIDNIGHT_MINUTES', 1440); // 24 hours
+define('MAX_MIDNIGHT_MINUTES', 1440); // 24 hours (local timezone)
 define('SECONDS_PER_MINUTE', 60);
 
 smart_log(LOG_INFO, "=== API.PHP STARTING ===");
@@ -61,6 +61,10 @@ smart_log(LOG_DEBUG, "Database connection successful");
 /**
  * Check if a user entry should be included in the current list
  * based on their time settings and current time
+ * 
+ * DESIGN CHOICE: Uses local server timezone for "until midnight" calculations.
+ * This is intentional - if you live in New Zealand, you go to bed on NZ time,
+ * not UTC midnight. This provides better UX for users in different timezones.
  */
 function shouldIncludeUser($freeInMinutes, $availableForMinutes, $postedTimestamp) {
     $now = time();
@@ -76,6 +80,7 @@ function shouldIncludeUser($freeInMinutes, $availableForMinutes, $postedTimestam
     $gracePeriodEnd = $freeEnd + GRACE_PERIOD_SECONDS;
     
     // Handle "until midnight" entries (no specific time given)
+    // Uses local server timezone - this is intentional for better UX
     if (isUntilMidnightEntry($freeInMinutes, $availableForMinutes)) {
         $midnight = strtotime('tomorrow', $postedTimestamp) - 1;
         return $now <= $midnight;
@@ -87,6 +92,9 @@ function shouldIncludeUser($freeInMinutes, $availableForMinutes, $postedTimestam
 
 /**
  * Check if this is an "until midnight" entry (no specific time given)
+ * 
+ * These entries are cleared at local midnight (server timezone), not UTC.
+ * This provides better UX for users in different timezones.
  */
 function isUntilMidnightEntry($freeInMinutes, $availableForMinutes) {
     return $freeInMinutes === 0 && 

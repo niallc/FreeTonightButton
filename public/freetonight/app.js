@@ -107,6 +107,13 @@ function parseTimeInput(hoursInput, minutesInput) {
     return hours * SECONDS_PER_MINUTE + minutes;
 }
 
+/**
+ * Calculate minutes until local midnight (not UTC)
+ * 
+ * DESIGN CHOICE: Uses local timezone for "until midnight" calculations.
+ * This is intentional - if you live in New Zealand, you go to bed on NZ time,
+ * not UTC midnight. This provides better UX for users in different timezones.
+ */
 function calculateTimeUntilMidnight() {
     const now = new Date();
     const midnight = new Date(now);
@@ -133,6 +140,7 @@ async function setFreeStatus() {
     let availableForMinutes = parseTimeInput(availableForHoursInput, availableForMinutesInput);
     
     // If no time is specified, set availableForMinutes to minutes until local midnight
+    // (Uses local timezone intentionally for better UX - see calculateTimeUntilMidnight docs)
     if (freeInMinutes === 0 && availableForMinutes === 0) {
         availableForMinutes = calculateTimeUntilMidnight();
         freeInMinutes = 0;
