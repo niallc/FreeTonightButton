@@ -91,8 +91,16 @@ async function setFreeStatus() {
         activity = 'up for anything';
     }
     // Parse input fields, treat blank as null
-    const freeInMinutes = freeInHoursInput.value === '' && freeInMinutesInput.value === '' ? null : (parseInt(freeInHoursInput.value, 10) || 0) * 60 + (parseInt(freeInMinutesInput.value, 10) || 0);
-    const availableForMinutes = availableForHoursInput.value === '' && availableForMinutesInput.value === '' ? null : (parseInt(availableForHoursInput.value, 10) || 0) * 60 + (parseInt(availableForMinutesInput.value, 10) || 0);
+    let freeInMinutes = freeInHoursInput.value === '' && freeInMinutesInput.value === '' ? null : (parseInt(freeInHoursInput.value, 10) || 0) * 60 + (parseInt(freeInMinutesInput.value, 10) || 0);
+    let availableForMinutes = availableForHoursInput.value === '' && availableForMinutesInput.value === '' ? null : (parseInt(availableForHoursInput.value, 10) || 0) * 60 + (parseInt(availableForMinutesInput.value, 10) || 0);
+    // If no time is specified, set availableForMinutes to minutes until local midnight
+    if (freeInMinutes === null && availableForMinutes === null) {
+        const now = new Date();
+        const midnight = new Date(now);
+        midnight.setHours(24, 0, 0, 0); // next local midnight
+        availableForMinutes = Math.floor((midnight - now) / 60000);
+        freeInMinutes = 0;
+    }
     // Allow blank availableForMinutes (null), but if set, must be > 0
     if (availableForMinutes !== null && availableForMinutes <= 0) {
         showActionFeedback('Available for must be greater than 0 minutes', 'error');
@@ -120,7 +128,7 @@ async function setFreeStatus() {
         }
     } catch (error) {
         console.error('Error:', error);
-        showActionFeedback('Network error - please try again', 'error');
+        showActionFeedback('Network error adding - please try again', 'error');
     }
 }
 
@@ -150,7 +158,7 @@ async function removeStatus() {
         }
     } catch (error) {
         console.error('Error:', error);
-        showActionFeedback('Network error - please try again', 'error');
+        showActionFeedback('Network error removing - please try again', 'error');
     }
 }
 
@@ -168,7 +176,7 @@ async function getFreeList() {
         }
     } catch (error) {
         console.error('Error:', error);
-        showActionFeedback('Network error - please try again', 'error');
+        showActionFeedback('Network error refreshing - please try again', 'error');
     }
 }
 
@@ -198,19 +206,41 @@ function displayFreeList(users) {
         listItem.appendChild(timeSpan);
         freeList.appendChild(listItem);
     });
-    updateAllTimers();
+    updateTimersOnly();
 }
-function updateAllTimers() {
+
+function updateTimersOnly() {
     freeListUsers.forEach((user, idx) => {
         const timerSpan = document.getElementById(`timer-${idx}`);
         if (!timerSpan) return;
         timerSpan.textContent = formatLiveRelativeTime(user);
     });
 }
+
+function removeExpiredUsersAndRedraw() {
+    const now = Math.floor(Date.now() / 1000);
+    const filtered = freeListUsers.filter(user => {
+        const posted = user.timestamp;
+        const freeIn = user.free_in_minutes || 0;
+        const availableFor = user.available_for_minutes || 0;
+        const freeStart = posted + freeIn * 60;
+        const freeEnd = freeStart + availableFor * 60;
+        // Show 'no longer available' for 1 hour after end, then remove
+        if (now < freeEnd + 3600) {
+            return true;
+        }
+        return false;
+    });
+    if (filtered.length !== freeListUsers.length) {
+        freeListUsers = filtered;
+        displayFreeList(freeListUsers);
+    } else {
+        updateTimersOnly();
+    }
+}
+
 function formatLiveRelativeTime(user) {
-    // If available_for_minutes is 0 or null, show nothing
     if (!user.available_for_minutes || user.available_for_minutes <= 0) return '';
-    // Calculate the time left
     const now = Math.floor(Date.now() / 1000);
     const posted = user.timestamp;
     const freeIn = user.free_in_minutes || 0;
@@ -221,8 +251,10 @@ function formatLiveRelativeTime(user) {
         return `Free in ${formatSeconds(freeStart - now)} (for ${formatSeconds(availableFor * 60)})`;
     } else if (now < freeEnd) {
         return `Free now (${formatSeconds(freeEnd - now)} left)`;
+    } else if (now < freeEnd + 3600) {
+        return 'No longer available';
     } else {
-        return 'No longer free';
+        return '';
     }
 }
 function formatSeconds(totalSeconds) {

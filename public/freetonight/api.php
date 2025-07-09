@@ -49,20 +49,19 @@ switch ($_SERVER['REQUEST_METHOD']) {
         // Set status - user declares they are free
         $input = json_decode(file_get_contents('php://input'), true);
         
-        if (!isset($input['name']) || trim($input['name']) === '') {
+        // Sanitize name first
+        $name = trim(strip_tags($input['name']));
+        if ($name === '') {
             http_response_code(400);
             echo json_encode(['error' => 'Name is required']);
             exit;
         }
-        
-        $name = trim(strip_tags($input['name']));
         if (strlen($name) > 50) {
             http_response_code(400);
             echo json_encode(['error' => 'Name too long (max 50 characters)']);
             exit;
         }
-        
-        // New fields with defaults
+        // Sanitize activity
         $activity = isset($input['activity']) ? trim($input['activity']) : 'Anything';
         if (strlen($activity) > 100) {
             http_response_code(400);
@@ -132,19 +131,35 @@ switch ($_SERVER['REQUEST_METHOD']) {
         error_log("Debug: Processing GET request");
         // Get list of free friends
         $start_of_day = strtotime('today', time());
-        
+        $now = time();
         try {
             $stmt = $pdo->prepare('SELECT name, activity, free_in_minutes, available_for_minutes, timestamp FROM status WHERE timestamp >= :start_of_day ORDER BY timestamp DESC');
             $stmt->execute(['start_of_day' => $start_of_day]);
             
             $users = [];
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $free_in = (int)$row['free_in_minutes'];
+                $available_for = (int)$row['available_for_minutes'];
+                $posted = (int)$row['timestamp'];
+                $free_start = $posted + $free_in * 60;
+                $free_end = $free_start + $available_for * 60;
+                // If no time specified (available_for == minutes until UTC midnight), clear at UTC midnight
+                // If times specified, remove 1 hour after end
+                if ($available_for === 0) continue; // skip invalid
+                if ($free_in === 0 && $available_for > 0 && $available_for <= 1440) {
+                    // No time specified, treat as 'until midnight' (up to 24h)
+                    $midnight = strtotime('tomorrow', $posted) - 1;
+                    if ($now > $midnight) continue; // past midnight, skip
+                } else {
+                    // Time specified, remove 1 hour after end
+                    if ($now > $free_end + 3600) continue;
+                }
                 $users[] = [
                     'name' => $row['name'],
                     'activity' => $row['activity'],
-                    'free_in_minutes' => (int)$row['free_in_minutes'],
-                    'available_for_minutes' => (int)$row['available_for_minutes'],
-                    'timestamp' => $row['timestamp']
+                    'free_in_minutes' => $free_in,
+                    'available_for_minutes' => $available_for,
+                    'timestamp' => $posted
                 ];
             }
             
