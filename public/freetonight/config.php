@@ -30,7 +30,12 @@ if ($is_production) {
     // Uses __DIR__ to get the absolute path of the current directory (public/freetonight)
     // then navigates up and over to the private directory.
     define('PRIVATE_PATH', realpath(__DIR__ . '/../../private/freetonight'));
-    define('DB_PATH', PRIVATE_PATH . '/friends.db');
+    $test_db = getenv('FREETONIGHT_TEST_DB');
+    if ($test_db) {
+        define('DB_PATH', PRIVATE_PATH . '/friends_test.db');
+    } else {
+        define('DB_PATH', PRIVATE_PATH . '/friends.db');
+    }
     define('LOG_PATH', PRIVATE_PATH . '/php_errors.log');
 }
 
