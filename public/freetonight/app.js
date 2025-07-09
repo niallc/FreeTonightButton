@@ -1,6 +1,13 @@
 // Version tracking for development
 const APP_VERSION = '1.0.0';
 
+// Constants
+const DEFAULT_ACTIVITY = 'up for anything';
+const SECONDS_PER_MINUTE = 60;
+const GRACE_PERIOD_SECONDS = 3600; // 1 hour after end time
+const REFRESH_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+const UPDATE_INTERVAL_MS = 1000; // 1 second
+
 // DOM elements
 let nameInput, activityInput, freeInHoursInput, freeInMinutesInput, availableForHoursInput, availableForMinutesInput;
 let freeButton, removeButton, refreshButton, actionFeedback, statusBar, freeList;
@@ -65,10 +72,10 @@ function setupEventListeners() {
 
 function setupTimers() {
     // Auto-refresh every 2 minutes
-    refreshTimer = setInterval(getFreeList, 2 * 60 * 1000);
+    refreshTimer = setInterval(getFreeList, REFRESH_INTERVAL_MS);
     
     // Update timer display every second
-    updateTimer = setInterval(updateTimerDisplay, 1000);
+    updateTimer = setInterval(updateTimerDisplay, UPDATE_INTERVAL_MS);
 }
 
 function loadSavedName() {
@@ -80,32 +87,59 @@ function loadSavedName() {
 
 let freeListUsers = [];
 
-async function setFreeStatus() {
-    const name = nameInput.value.trim();
-    if (!name) {
+// Helper functions for input validation and processing
+function validateName(name) {
+    if (!name.trim()) {
         showActionFeedback('Please enter your name first', 'error');
-        return;
+        return false;
     }
-    let activity = activityInput.value.trim();
-    if (!activity) {
-        activity = 'up for anything';
-    }
-    // Parse input fields, treat blank as null
-    let freeInMinutes = freeInHoursInput.value === '' && freeInMinutesInput.value === '' ? null : (parseInt(freeInHoursInput.value, 10) || 0) * 60 + (parseInt(freeInMinutesInput.value, 10) || 0);
-    let availableForMinutes = availableForHoursInput.value === '' && availableForMinutesInput.value === '' ? null : (parseInt(availableForHoursInput.value, 10) || 0) * 60 + (parseInt(availableForMinutesInput.value, 10) || 0);
-    // If no time is specified, set availableForMinutes to minutes until local midnight
-    if (freeInMinutes === null && availableForMinutes === null) {
-        const now = new Date();
-        const midnight = new Date(now);
-        midnight.setHours(24, 0, 0, 0); // next local midnight
-        availableForMinutes = Math.floor((midnight - now) / 60000);
-        freeInMinutes = 0;
-    }
-    // Allow blank availableForMinutes (null), but if set, must be > 0
+    return true;
+}
+
+function getActivity() {
+    const activity = activityInput.value.trim();
+    return activity || DEFAULT_ACTIVITY;
+}
+
+function parseTimeInput(hoursInput, minutesInput) {
+    const hours = hoursInput.value === '' ? 0 : parseInt(hoursInput.value, 10) || 0;
+    const minutes = minutesInput.value === '' ? 0 : parseInt(minutesInput.value, 10) || 0;
+    return hours * SECONDS_PER_MINUTE + minutes;
+}
+
+function calculateTimeUntilMidnight() {
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0); // next local midnight
+    return Math.floor((midnight - now) / 60000);
+}
+
+function validateAvailableTime(availableForMinutes) {
     if (availableForMinutes !== null && availableForMinutes <= 0) {
         showActionFeedback('Available for must be greater than 0 minutes', 'error');
-        return;
+        return false;
     }
+    return true;
+}
+
+async function setFreeStatus() {
+    const name = nameInput.value.trim();
+    if (!validateName(name)) return;
+    
+    const activity = getActivity();
+    
+    // Parse time inputs
+    let freeInMinutes = parseTimeInput(freeInHoursInput, freeInMinutesInput);
+    let availableForMinutes = parseTimeInput(availableForHoursInput, availableForMinutesInput);
+    
+    // If no time is specified, set availableForMinutes to minutes until local midnight
+    if (freeInMinutes === 0 && availableForMinutes === 0) {
+        availableForMinutes = calculateTimeUntilMidnight();
+        freeInMinutes = 0;
+    }
+    
+    if (!validateAvailableTime(availableForMinutes)) return;
+    
     try {
         const response = await fetch('/freetonight/api.php', {
             method: 'POST',
@@ -115,8 +149,8 @@ async function setFreeStatus() {
             body: JSON.stringify({
                 name: name,
                 activity: activity,
-                free_in_minutes: freeInMinutes === null ? 0 : freeInMinutes,
-                available_for_minutes: availableForMinutes === null ? 0 : availableForMinutes
+                free_in_minutes: freeInMinutes,
+                available_for_minutes: availableForMinutes
             })
         });
         const data = await response.json();
@@ -180,32 +214,47 @@ async function getFreeList() {
     }
 }
 
+function createUserListItem(user, index) {
+    const listItem = document.createElement('li');
+    const nameSpan = document.createElement('span');
+    const activitySpan = document.createElement('span');
+    const timeSpan = document.createElement('span');
+    
+    nameSpan.textContent = user.name;
+    activitySpan.textContent = user.activity ? ` (${user.activity})` : '';
+    activitySpan.className = 'activity';
+    activitySpan.title = user.activity || '';
+    timeSpan.id = `timer-${index}`;
+    timeSpan.className = 'timestamp';
+    
+    listItem.appendChild(nameSpan);
+    listItem.appendChild(activitySpan);
+    listItem.appendChild(timeSpan);
+    
+    return listItem;
+}
+
+function createEmptyListItem() {
+    const emptyItem = document.createElement('li');
+    emptyItem.textContent = 'No one is free yet';
+    emptyItem.style.textAlign = 'center';
+    emptyItem.style.color = '#666';
+    return emptyItem;
+}
+
 function displayFreeList(users) {
     freeList.innerHTML = '';
+    
     if (users.length === 0) {
-        const emptyItem = document.createElement('li');
-        emptyItem.textContent = 'No one is free yet';
-        emptyItem.style.textAlign = 'center';
-        emptyItem.style.color = '#666';
-        freeList.appendChild(emptyItem);
+        freeList.appendChild(createEmptyListItem());
         return;
     }
+    
     users.forEach((user, idx) => {
-        const listItem = document.createElement('li');
-        const nameSpan = document.createElement('span');
-        const activitySpan = document.createElement('span');
-        const timeSpan = document.createElement('span');
-        nameSpan.textContent = user.name;
-        activitySpan.textContent = user.activity ? ` (${user.activity})` : '';
-        activitySpan.className = 'activity';
-        activitySpan.title = user.activity || '';
-        timeSpan.id = `timer-${idx}`;
-        timeSpan.className = 'timestamp';
-        listItem.appendChild(nameSpan);
-        listItem.appendChild(activitySpan);
-        listItem.appendChild(timeSpan);
+        const listItem = createUserListItem(user, idx);
         freeList.appendChild(listItem);
     });
+    
     updateTimersOnly();
 }
 
@@ -223,10 +272,10 @@ function removeExpiredUsersAndRedraw() {
         const posted = user.timestamp;
         const freeIn = user.free_in_minutes || 0;
         const availableFor = user.available_for_minutes || 0;
-        const freeStart = posted + freeIn * 60;
-        const freeEnd = freeStart + availableFor * 60;
+        const freeStart = posted + freeIn * SECONDS_PER_MINUTE;
+        const freeEnd = freeStart + availableFor * SECONDS_PER_MINUTE;
         // Show 'no longer available' for 1 hour after end, then remove
-        if (now < freeEnd + 3600) {
+        if (now < freeEnd + GRACE_PERIOD_SECONDS) {
             return true;
         }
         return false;
@@ -245,13 +294,13 @@ function formatLiveRelativeTime(user) {
     const posted = user.timestamp;
     const freeIn = user.free_in_minutes || 0;
     const availableFor = user.available_for_minutes || 0;
-    const freeStart = posted + freeIn * 60;
-    const freeEnd = freeStart + availableFor * 60;
+    const freeStart = posted + freeIn * SECONDS_PER_MINUTE;
+    const freeEnd = freeStart + availableFor * SECONDS_PER_MINUTE;
     if (now < freeStart) {
-        return `Free in ${formatSeconds(freeStart - now)} (for ${formatSeconds(availableFor * 60)})`;
+        return `Free in ${formatSeconds(freeStart - now)} (for ${formatSeconds(availableFor * SECONDS_PER_MINUTE)})`;
     } else if (now < freeEnd) {
         return `Free now (${formatSeconds(freeEnd - now)} left)`;
-    } else if (now < freeEnd + 3600) {
+    } else if (now < freeEnd + GRACE_PERIOD_SECONDS) {
         return 'No longer available';
     } else {
         return '';

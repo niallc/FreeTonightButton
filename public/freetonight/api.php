@@ -3,6 +3,14 @@ header('Content-Type: application/json');
 
 require_once 'config.php';
 
+// --- Constants ---
+define('MAX_NAME_LENGTH', 50);
+define('MAX_ACTIVITY_LENGTH', 100);
+define('DEFAULT_AVAILABLE_FOR_MINUTES', 240);
+define('GRACE_PERIOD_SECONDS', 3600); // 1 hour after end time
+define('MAX_MIDNIGHT_MINUTES', 1440); // 24 hours
+define('SECONDS_PER_MINUTE', 60);
+
 smart_log(LOG_INFO, "=== API.PHP STARTING ===");
 
 smart_log(LOG_DEBUG, "Config loaded successfully");
@@ -48,59 +56,112 @@ try {
 
 smart_log(LOG_DEBUG, "Database connection successful");
 
+// --- Time Logic Helper Functions ---
+
+/**
+ * Check if a user entry should be included in the current list
+ * based on their time settings and current time
+ */
+function shouldIncludeUser($freeInMinutes, $availableForMinutes, $postedTimestamp) {
+    $now = time();
+    
+    // Skip invalid entries (no available time)
+    if ($availableForMinutes === 0) {
+        return false;
+    }
+    
+    // Calculate time boundaries
+    $freeStart = $postedTimestamp + ($freeInMinutes * SECONDS_PER_MINUTE);
+    $freeEnd = $freeStart + ($availableForMinutes * SECONDS_PER_MINUTE);
+    $gracePeriodEnd = $freeEnd + GRACE_PERIOD_SECONDS;
+    
+    // Handle "until midnight" entries (no specific time given)
+    if (isUntilMidnightEntry($freeInMinutes, $availableForMinutes)) {
+        $midnight = strtotime('tomorrow', $postedTimestamp) - 1;
+        return $now <= $midnight;
+    }
+    
+    // Handle specific time entries (remove after grace period)
+    return $now < $gracePeriodEnd;
+}
+
+/**
+ * Check if this is an "until midnight" entry (no specific time given)
+ */
+function isUntilMidnightEntry($freeInMinutes, $availableForMinutes) {
+    return $freeInMinutes === 0 && 
+           $availableForMinutes > 0 && 
+           $availableForMinutes <= MAX_MIDNIGHT_MINUTES;
+}
+
+/**
+ * Sanitize and validate user input
+ */
+function validateUserInput($input) {
+    $name = trim(strip_tags($input['name'] ?? ''));
+    if ($name === '') {
+        return ['error' => 'Name is required'];
+    }
+    if (strlen($name) > MAX_NAME_LENGTH) {
+        return ['error' => 'Name too long (max ' . MAX_NAME_LENGTH . ' characters)'];
+    }
+    
+    $activity = isset($input['activity']) ? trim($input['activity']) : 'Anything';
+    if (strlen($activity) > MAX_ACTIVITY_LENGTH) {
+        return ['error' => 'Activity too long (max ' . MAX_ACTIVITY_LENGTH . ' characters)'];
+    }
+    
+    $freeInMinutes = isset($input['free_in_minutes']) && is_numeric($input['free_in_minutes']) 
+        ? (int)$input['free_in_minutes'] : 0;
+    $availableForMinutes = isset($input['available_for_minutes']) && is_numeric($input['available_for_minutes']) 
+        ? (int)$input['available_for_minutes'] : DEFAULT_AVAILABLE_FOR_MINUTES;
+    
+    return [
+        'name' => $name,
+        'activity' => $activity,
+        'free_in_minutes' => $freeInMinutes,
+        'available_for_minutes' => $availableForMinutes
+    ];
+}
+
 switch ($_SERVER['REQUEST_METHOD']) {
     case 'POST':
         smart_log(LOG_DEBUG, "Processing POST request");
-        // Set status - user declares they are free
         $input = json_decode(file_get_contents('php://input'), true);
         
-        // Sanitize name first
-        $name = trim(strip_tags($input['name']));
-        if ($name === '') {
+        // Validate and sanitize input
+        $validated = validateUserInput($input);
+        if (isset($validated['error'])) {
             http_response_code(400);
-            echo json_encode(['error' => 'Name is required']);
+            echo json_encode(['error' => $validated['error']]);
             exit;
         }
-        if (strlen($name) > 50) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Name too long (max 50 characters)']);
-            exit;
-        }
-        // Sanitize activity
-        $activity = isset($input['activity']) ? trim($input['activity']) : 'Anything';
-        if (strlen($activity) > 100) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Activity too long (max 100 characters)']);
-            exit;
-        }
-        $free_in_minutes = isset($input['free_in_minutes']) && is_numeric($input['free_in_minutes']) ? (int)$input['free_in_minutes'] : 0;
-        $available_for_minutes = isset($input['available_for_minutes']) && is_numeric($input['available_for_minutes']) ? (int)$input['available_for_minutes'] : 240;
         
         try {
             $stmt = $pdo->prepare('REPLACE INTO status (name, activity, free_in_minutes, available_for_minutes, timestamp) VALUES (:name, :activity, :free_in_minutes, :available_for_minutes, :timestamp)');
             $stmt->execute([
-                'name' => $name,
-                'activity' => $activity,
-                'free_in_minutes' => $free_in_minutes,
-                'available_for_minutes' => $available_for_minutes,
+                'name' => $validated['name'],
+                'activity' => $validated['activity'],
+                'free_in_minutes' => $validated['free_in_minutes'],
+                'available_for_minutes' => $validated['available_for_minutes'],
                 'timestamp' => time()
             ]);
             
             smart_log(LOG_INFO, "User status updated", [
-                'name' => $name,
-                'activity' => $activity,
-                'free_in_minutes' => $free_in_minutes,
-                'available_for_minutes' => $available_for_minutes
+                'name' => $validated['name'],
+                'activity' => $validated['activity'],
+                'free_in_minutes' => $validated['free_in_minutes'],
+                'available_for_minutes' => $validated['available_for_minutes']
             ]);
             
             echo json_encode([
                 'success' => true,
-                'message' => "Status for $name updated."
+                'message' => "Status for {$validated['name']} updated."
             ]);
         } catch (PDOException $e) {
             smart_log(LOG_ERROR, "Database error during POST", [
                 'error' => $e->getMessage(),
-                'name' => $name
+                'name' => $validated['name']
             ]);
             http_response_code(500);
             echo json_encode(['error' => 'Failed to update status']);
@@ -149,38 +210,28 @@ switch ($_SERVER['REQUEST_METHOD']) {
         
     case 'GET':
         smart_log(LOG_DEBUG, "Processing GET request");
-        // Get list of free friends
         $start_of_day = strtotime('today', time());
-        $now = time();
+        
         try {
             $stmt = $pdo->prepare('SELECT name, activity, free_in_minutes, available_for_minutes, timestamp FROM status WHERE timestamp >= :start_of_day ORDER BY timestamp DESC');
             $stmt->execute(['start_of_day' => $start_of_day]);
             
             $users = [];
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                $free_in = (int)$row['free_in_minutes'];
-                $available_for = (int)$row['available_for_minutes'];
+                $freeIn = (int)$row['free_in_minutes'];
+                $availableFor = (int)$row['available_for_minutes'];
                 $posted = (int)$row['timestamp'];
-                $free_start = $posted + $free_in * 60;
-                $free_end = $free_start + $available_for * 60;
-                // If no time specified (available_for == minutes until UTC midnight), clear at UTC midnight
-                // If times specified, remove 1 hour after end
-                if ($available_for === 0) continue; // skip invalid
-                if ($free_in === 0 && $available_for > 0 && $available_for <= 1440) {
-                    // No time specified, treat as 'until midnight' (up to 24h)
-                    $midnight = strtotime('tomorrow', $posted) - 1;
-                    if ($now > $midnight) continue; // past midnight, skip
-                } else {
-                    // Time specified, remove 1 hour after end
-                    if ($now > $free_end + 3600) continue;
+                
+                // Use the clean time logic function
+                if (shouldIncludeUser($freeIn, $availableFor, $posted)) {
+                    $users[] = [
+                        'name' => $row['name'],
+                        'activity' => $row['activity'],
+                        'free_in_minutes' => $freeIn,
+                        'available_for_minutes' => $availableFor,
+                        'timestamp' => $posted
+                    ];
                 }
-                $users[] = [
-                    'name' => $row['name'],
-                    'activity' => $row['activity'],
-                    'free_in_minutes' => $free_in,
-                    'available_for_minutes' => $available_for,
-                    'timestamp' => $posted
-                ];
             }
             
             smart_log(LOG_DEBUG, "Retrieved user list", ['count' => count($users)]);
