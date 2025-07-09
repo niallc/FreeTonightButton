@@ -4,14 +4,14 @@
 # 
 # For NearlyFreeSpeech.net (default):
 #   ./deploy.sh
-#   ./deploy.sh ssh.nyc1.nearlyfreespeech.net niallcardin_niallhome
+#   ./deploy.sh ssh.nyc1.nearlyfreespeech.net your-username
 #
 # For other hosting services, modify the variables below:
 #   ./deploy.sh your-server.com your-username
 
 # Default NearlyFreeSpeech.net settings
 DEFAULT_SERVER="ssh.nyc1.nearlyfreespeech.net"
-DEFAULT_USERNAME="niallcardin_niallhome"
+DEFAULT_USERNAME="your-username"
 DEFAULT_PUBLIC_PATH="/home/public/freetonight/"
 DEFAULT_PRIVATE_PATH="/home/private/freetonight/"
 

@@ -6,8 +6,8 @@ Thank you for your interest in contributing to this project! This is a simple, f
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/free-tonight-button.git
-   cd free-tonight-button
+   git clone https://github.com/niallc/FreeTonightButton.git
+   cd FreeTonightButton
    ```
 
 2. **Start the development server:**

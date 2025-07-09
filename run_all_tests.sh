@@ -76,12 +76,4 @@ else
     echo "⚠️  JavaScript Tests: Skipped (Node.js not available)"
 fi
 
-echo ""
-echo "Recent improvements tested:"
-echo "• Smart logging system (environment-aware)"
-echo "• Refactored time logic with helper functions"
-echo "• Input validation and sanitization"
-echo "• Constants and configuration"
-echo "• JavaScript helper functions"
-
 exit $OVERALL_RESULT 

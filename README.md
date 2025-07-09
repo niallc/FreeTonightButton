@@ -21,7 +21,7 @@ A simple web application where friends can indicate they are "free tonight" and 
 
 2. **Open your browser:**
    ```
-   http://localhost:8000/freetonight/
+   http://localhost:8002/freetonight/
    ```
 
 ### Running Tests
