@@ -21,7 +21,7 @@ let nameInput, activityInput, freeInHoursInput, freeInMinutesInput, availableFor
 let freeButton, removeButton, refreshButton, actionFeedback, statusBar, freeList;
 let toggleOptionsButton, moreOptionsDiv;
 let createGroupButton, deleteGroupButton, groupModal, groupTitle, groupManagement;
-let groupNameInput, groupDisplayInput, createGroupForm, cancelCreateGroupButton, backToDefaultButton;
+let groupNameInput, groupDisplayInput, createGroupForm, cancelCreateGroupButton, backToDefaultButton, groupCreateError;
 
 // Timers
 let refreshTimer, updateTimer;
@@ -83,6 +83,7 @@ function initializeElements() {
     createGroupForm = document.getElementById('create-group-form');
     cancelCreateGroupButton = document.getElementById('cancel-create-group');
     backToDefaultButton = document.getElementById('back-to-default-button');
+    groupCreateError = document.getElementById('group-create-error');
     
     debugLog('Element initialization results:', {
         createGroupButton: !!createGroupButton,
@@ -199,8 +200,23 @@ function goToDefaultGroup() {
     getFreeList();
 }
 
+function showGroupCreateError(message) {
+    if (groupCreateError) {
+        groupCreateError.textContent = message;
+        groupCreateError.style.display = 'block';
+    }
+}
+
+function hideGroupCreateError() {
+    if (groupCreateError) {
+        groupCreateError.textContent = '';
+        groupCreateError.style.display = 'none';
+    }
+}
+
 function showCreateGroupModal() {
     groupModal.style.display = 'flex';
+    hideGroupCreateError();
     groupNameInput.focus();
 }
 
@@ -208,6 +224,7 @@ function hideCreateGroupModal() {
     groupModal.style.display = 'none';
     groupNameInput.value = '';
     groupDisplayInput.value = '';
+    hideGroupCreateError();
 }
 
 async function createGroup(e) {
@@ -217,13 +234,13 @@ async function createGroup(e) {
     const displayName = groupDisplayInput.value.trim() || groupName;
     
     if (!groupName) {
-        showActionFeedback('Please enter a group name', 'error');
+        showGroupCreateError('Please enter a group name');
         return;
     }
     
     // Validate group name format
     if (!/^[a-zA-Z0-9_-]+$/.test(groupName)) {
-        showActionFeedback('Group name can only contain letters, numbers, underscores, and hyphens', 'error');
+        showGroupCreateError('Group name can only contain letters, numbers, underscores, and hyphens');
         return;
     }
     
@@ -243,17 +260,18 @@ async function createGroup(e) {
         const data = await response.json();
         
         if (response.ok) {
+            hideGroupCreateError();
             showActionFeedback(data.message, 'success');
             hideCreateGroupModal();
             
             // Switch to the new group
             window.location.hash = groupName;
         } else {
-            showActionFeedback(data.error || 'Failed to create group', 'error');
+            showGroupCreateError(data.error || 'Failed to create group');
         }
     } catch (error) {
         console.error('Error:', error);
-        showActionFeedback('Network error creating group - please try again', 'error');
+        showGroupCreateError('Network error creating group - please try again');
     }
 }
 
