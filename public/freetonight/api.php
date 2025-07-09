@@ -1,23 +1,23 @@
 <?php
 header('Content-Type: application/json');
 
-error_log("=== API.PHP STARTING ===");
-
 require_once 'config.php';
 
-error_log("Debug: Config loaded successfully");
+smart_log(LOG_INFO, "=== API.PHP STARTING ===");
+
+smart_log(LOG_DEBUG, "Config loaded successfully");
 
 try {
-    error_log("Debug: Attempting to connect to database at: " . DB_PATH);
+    smart_log(LOG_DEBUG, "Attempting to connect to database", ['path' => DB_PATH]);
     
     $pdo = new PDO('sqlite:' . DB_PATH);
-    error_log("Debug: PDO object created");
+    smart_log(LOG_DEBUG, "PDO object created");
     
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    error_log("Debug: PDO error mode set");
+    smart_log(LOG_DEBUG, "PDO error mode set");
     
     // Create table if it doesn't exist
-    error_log("Debug: Creating table if it doesn't exist");
+    smart_log(LOG_DEBUG, "Creating table if it doesn't exist");
     $pdo->exec('CREATE TABLE IF NOT EXISTS status (
         id INTEGER PRIMARY KEY,
         name TEXT NOT NULL UNIQUE,
@@ -26,26 +26,31 @@ try {
         available_for_minutes INTEGER DEFAULT 240,
         timestamp INTEGER NOT NULL
     )');
-    error_log("Debug: Table creation/check completed");
+    smart_log(LOG_DEBUG, "Table creation/check completed");
     
 } catch (PDOException $e) {
-    error_log("Database connection failed: " . $e->getMessage());
-    error_log("Debug: PDO error details: " . print_r($e, true));
+    smart_log(LOG_ERROR, "Database connection failed", [
+        'error' => $e->getMessage(),
+        'details' => $e->getTraceAsString()
+    ]);
     http_response_code(500);
     echo json_encode(['error' => 'Database connection failed: ' . $e->getMessage()]);
     exit;
 } catch (Exception $e) {
-    error_log("Unexpected error: " . $e->getMessage());
+    smart_log(LOG_ERROR, "Unexpected error", [
+        'error' => $e->getMessage(),
+        'details' => $e->getTraceAsString()
+    ]);
     http_response_code(500);
     echo json_encode(['error' => 'Unexpected error: ' . $e->getMessage()]);
     exit;
 }
 
-error_log("Debug: Database connection successful");
+smart_log(LOG_DEBUG, "Database connection successful");
 
 switch ($_SERVER['REQUEST_METHOD']) {
     case 'POST':
-        error_log("Debug: Processing POST request");
+        smart_log(LOG_DEBUG, "Processing POST request");
         // Set status - user declares they are free
         $input = json_decode(file_get_contents('php://input'), true);
         
@@ -81,19 +86,29 @@ switch ($_SERVER['REQUEST_METHOD']) {
                 'timestamp' => time()
             ]);
             
+            smart_log(LOG_INFO, "User status updated", [
+                'name' => $name,
+                'activity' => $activity,
+                'free_in_minutes' => $free_in_minutes,
+                'available_for_minutes' => $available_for_minutes
+            ]);
+            
             echo json_encode([
                 'success' => true,
                 'message' => "Status for $name updated."
             ]);
         } catch (PDOException $e) {
-            error_log("Database error: " . $e->getMessage());
+            smart_log(LOG_ERROR, "Database error during POST", [
+                'error' => $e->getMessage(),
+                'name' => $name
+            ]);
             http_response_code(500);
             echo json_encode(['error' => 'Failed to update status']);
         }
         break;
         
     case 'DELETE':
-        error_log("Debug: Processing DELETE request");
+        smart_log(LOG_DEBUG, "Processing DELETE request");
         // Remove status - user removes themselves from list
         $input = json_decode(file_get_contents('php://input'), true);
         
@@ -110,25 +125,30 @@ switch ($_SERVER['REQUEST_METHOD']) {
             $stmt->execute(['name' => $name]);
             
             if ($stmt->rowCount() > 0) {
+                smart_log(LOG_INFO, "User removed from list", ['name' => $name]);
                 echo json_encode([
                     'success' => true,
                     'message' => "$name removed from list."
                 ]);
             } else {
+                smart_log(LOG_WARN, "User not found for deletion", ['name' => $name]);
                 echo json_encode([
                     'success' => true,
                     'message' => "$name was not in the list."
                 ]);
             }
         } catch (PDOException $e) {
-            error_log("Database error: " . $e->getMessage());
+            smart_log(LOG_ERROR, "Database error during DELETE", [
+                'error' => $e->getMessage(),
+                'name' => $name
+            ]);
             http_response_code(500);
             echo json_encode(['error' => 'Failed to remove status']);
         }
         break;
         
     case 'GET':
-        error_log("Debug: Processing GET request");
+        smart_log(LOG_DEBUG, "Processing GET request");
         // Get list of free friends
         $start_of_day = strtotime('today', time());
         $now = time();
@@ -163,18 +183,22 @@ switch ($_SERVER['REQUEST_METHOD']) {
                 ];
             }
             
+            smart_log(LOG_DEBUG, "Retrieved user list", ['count' => count($users)]);
             echo json_encode($users);
         } catch (PDOException $e) {
-            error_log("Database error: " . $e->getMessage());
+            smart_log(LOG_ERROR, "Database error during GET", [
+                'error' => $e->getMessage()
+            ]);
             http_response_code(500);
             echo json_encode(['error' => 'Failed to retrieve status list']);
         }
         break;
         
     default:
+        smart_log(LOG_WARN, "Invalid HTTP method", ['method' => $_SERVER['REQUEST_METHOD']]);
         http_response_code(405);
         echo json_encode(['error' => 'Method not allowed']);
         break;
 }
 
-error_log("=== API.PHP COMPLETE ==="); 
+smart_log(LOG_INFO, "=== API.PHP COMPLETE ==="); 
